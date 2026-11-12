@@ -22,6 +22,7 @@ import { cx } from '../ui/primitives';
 import { haptic } from '../ui/haptics';
 import { ToastProvider } from '../ui/Toast';
 import { ROUTES, useRoute, type Route } from './router';
+import { BackButtonHandler } from '../features/back/BackButton';
 
 function Logo({ light }: { light?: boolean }) {
   return (
@@ -201,6 +202,7 @@ function Shell() {
         </main>
       </div>
       <MobileNav route={route} go={go} />
+      <BackButtonHandler route={route} go={go} />
     </div>
   );
 }
