@@ -1,12 +1,13 @@
-import { Info, Trash2 } from 'lucide-react';
+import { Camera, Info, Trash2 } from 'lucide-react';
 import { useId, useMemo, useState, type FormEvent } from 'react';
-import { LEVEL_PRESETS, levelCategory, storedStock } from '../../domain/calc';
+import { storedStock } from '../../domain/calc';
 import { isValidIso, todayIso } from '../../domain/dates';
 import { fmtBags, fmtEur, fmtKg } from '../../domain/format';
-import type { LevelCategory, NewRecord, PelletRecord, RecordKind } from '../../domain/types';
+import type { NewRecord, PelletRecord, RecordKind } from '../../domain/types';
 import { useStore } from '../../store/store';
 import { DateInput, decimalToInput, parseDecimal, StepperInput, TextArea, TextInput } from '../../ui/fields';
-import { Button, Segmented } from '../../ui/primitives';
+import { Button, cx, Segmented } from '../../ui/primitives';
+import { PhotoLevelDialog } from '../hopper/PhotoLevelDialog';
 
 type Errors = Record<string, string>;
 
@@ -17,12 +18,8 @@ interface Props {
   onDelete?: () => void;
 }
 
-const LEVEL_OPTIONS: { value: LevelCategory; label: string }[] = [
-  { value: 'lleno', label: 'Llena' },
-  { value: 'medio', label: 'Media' },
-  { value: 'bajo', label: 'Baja' },
-  { value: 'vacio', label: 'Vacía' },
-];
+/** Estimación a ojo en pasos de 10 %. */
+const LEVEL_STEPS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
 function Note({ children }: { children: React.ReactNode }) {
   return (
@@ -67,8 +64,10 @@ export function RecordForm({ kind, initial, onDone, onDelete }: Props) {
   // Nivel
   const initialPercent = g<number>('percent', 50);
   const [levelMode, setLevelMode] = useState<'estimacion' | 'exacto'>(i && i.approximate === false ? 'exacto' : 'estimacion');
-  const [cat, setCat] = useState<LevelCategory | null>(initial ? levelCategory(initialPercent) : null);
+  const [estPercent, setEstPercent] = useState<number | null>(initial ? Math.round(initialPercent / 10) * 10 : null);
   const [percent, setPercent] = useState<string>(String(initialPercent));
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [measuredByPhoto, setMeasuredByPhoto] = useState(false);
 
   // Recuento
   // Un recuento nuevo parte de lo que consta ahora: basta con pulsar − o + si hay diferencia.
@@ -154,12 +153,19 @@ export function RecordForm({ kind, initial, onDone, onDelete }: Props) {
       }
       case 'level': {
         if (levelMode === 'estimacion') {
-          if (!cat) e.level = 'Elige cómo está la tolva.';
-          else rec = { kind, ...base, percent: LEVEL_PRESETS[cat], approximate: true };
+          if (estPercent == null) e.level = 'Elige cómo está la tolva.';
+          else rec = { kind, ...base, percent: estPercent, approximate: true };
         } else {
           const p = parseDecimal(percent);
           if (!Number.isFinite(p) || p < 0 || p > 100) e.percent = 'Indica un porcentaje entre 0 y 100.';
-          else rec = { kind, ...base, percent: Math.round(p), approximate: false };
+          else
+            rec = {
+              kind,
+              ...base,
+              percent: Math.round(p),
+              approximate: false,
+              notes: measuredByPhoto && !base.notes ? 'Medido con foto' : base.notes,
+            };
         }
         break;
       }
@@ -343,9 +349,37 @@ export function RecordForm({ kind, initial, onDone, onDelete }: Props) {
           />
           {levelMode === 'estimacion' ? (
             <div className="flex flex-col gap-1.5">
-              <Segmented label="Nivel de la tolva" value={cat} onChange={setCat} options={LEVEL_OPTIONS} />
+              <p className="text-sm font-semibold">Nivel de la tolva</p>
+              <div role="group" aria-label="Nivel de la tolva" className="grid grid-cols-6 gap-1.5">
+                {LEVEL_STEPS.map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    aria-pressed={estPercent === v}
+                    onClick={() => setEstPercent(v)}
+                    className={cx(
+                      'h-10 rounded-xl text-[0.8125rem] font-semibold ring-1 ring-inset transition-[background-color,color,transform] duration-150 active:scale-95',
+                      estPercent === v ? 'bg-forest text-paper ring-forest' : 'bg-surface text-ink ring-line hover:bg-sand-soft',
+                    )}
+                  >
+                    {v === 0 ? 'Vacía' : v === 100 ? 'Llena' : `${v} %`}
+                  </button>
+                ))}
+              </div>
               {errors.level && <p className="text-[0.8125rem] font-medium text-rust">{errors.level}</p>}
               <p className="text-[0.8125rem] text-ink-3">Las estimaciones se muestran en el panel pero no se usan para calcular consumo.</p>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="-ml-2 self-start"
+                icon={<Camera className="size-4" />}
+                onClick={() => {
+                  setLevelMode('exacto');
+                  setPhotoOpen(true);
+                }}
+              >
+                Medir con foto
+              </Button>
             </div>
           ) : (
             <div className="flex flex-col gap-2">
@@ -363,13 +397,22 @@ export function RecordForm({ kind, initial, onDone, onDelete }: Props) {
                   type="range"
                   min={0}
                   max={100}
-                  step={5}
+                  step={1}
                   aria-label="Nivel en porcentaje"
                   value={Number.isFinite(parseDecimal(percent)) ? parseDecimal(percent) : 0}
                   onChange={(e) => setPercent(e.target.value)}
                   className="mb-3 h-2 flex-1 accent-olive"
                 />
               </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="-ml-2 self-start"
+                icon={<Camera className="size-4" />}
+                onClick={() => setPhotoOpen(true)}
+              >
+                {measuredByPhoto ? 'Medir otra vez con foto' : 'Medir con foto'}
+              </Button>
               <p className="text-[0.8125rem] text-ink-3">
                 {s.hopperCapacityKg
                   ? `Con una tolva de ${fmtKg(s.hopperCapacityKg)}, ${percent || 0} % ≈ ${fmtKg((s.hopperCapacityKg * (parseDecimal(percent) || 0)) / 100)}. Dos lecturas en porcentaje permiten calcular el consumo.`
@@ -378,6 +421,14 @@ export function RecordForm({ kind, initial, onDone, onDelete }: Props) {
             </div>
           )}
           <DateInput label="Fecha" value={date} onChange={setDate} error={errors.date} />
+          <PhotoLevelDialog
+            open={photoOpen}
+            onClose={() => setPhotoOpen(false)}
+            onResult={(p) => {
+              setPercent(String(p));
+              setMeasuredByPhoto(true);
+            }}
+          />
         </>
       )}
 

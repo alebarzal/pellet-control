@@ -12,6 +12,7 @@
   "dependencies": {
     "@capacitor/android": "^7.4.3",
     "@capacitor/browser": "^7.0.2",
+    "@capacitor/camera": "^7.0.2",
     "@capacitor/core": "^7.4.3",
     "@capacitor/filesystem": "^7.1.4",
     "@capacitor/haptics": "^7.0.2",
