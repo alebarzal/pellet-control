@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Pellet Control</string>
+    <string name="title_activity_main">Pellet Control</string>
+    <string name="package_name">es.pelletcontrol.app</string>
+    <string name="custom_url_scheme">es.pelletcontrol.app</string>
+    <string name="widget_description">Sacos, tolva y autonomía, con compra y recarga a un toque</string>
+</resources>

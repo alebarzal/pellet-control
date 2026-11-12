@@ -1,0 +1,11 @@
+node_modules
+dist
+*.tsbuildinfo
+.env.local
+.env.*.local
+.idea
+.vscode
+.playwright-mcp
+*.apk
+*.aab
+trailer
