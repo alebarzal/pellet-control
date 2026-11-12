@@ -48,8 +48,8 @@ export function HopperStatus({ footer }: { footer?: ReactNode } = {}) {
     });
   }
 
-  function fromPhoto(percent: number) {
-    const rec = addRecord({ kind: 'level', date: todayIso(), percent, approximate: false, notes: 'Medido con foto' });
+  function fromPhoto(percent: number, fraction: number) {
+    const rec = addRecord({ kind: 'level', date: todayIso(), percent, approximate: false, photo: fraction, notes: 'Medido con foto' });
     toast.show({
       title: `Nivel medido con foto: ${percent} %`,
       action: { label: 'Deshacer', onClick: () => deleteRecord(rec.id) },

@@ -67,7 +67,10 @@ export function RecordForm({ kind, initial, onDone, onDelete }: Props) {
   const [estPercent, setEstPercent] = useState<number | null>(initial ? Math.round(initialPercent / 10) * 10 : null);
   const [percent, setPercent] = useState<string>(String(initialPercent));
   const [photoOpen, setPhotoOpen] = useState(false);
-  const [measuredByPhoto, setMeasuredByPhoto] = useState(false);
+  const [photoFraction, setPhotoFraction] = useState<number | null>(typeof i?.photo === 'number' ? (i.photo as number) : null);
+  const measuredByPhoto = photoFraction != null;
+  // Si se cambia el % a mano después de la foto, la lectura deja de servir para calibrar.
+  const [lastPhotoPercent, setLastPhotoPercent] = useState<number | null>(typeof i?.photo === 'number' ? (i.percent as number) : null);
 
   // Recuento
   // Un recuento nuevo parte de lo que consta ahora: basta con pulsar − o + si hay diferencia.
@@ -164,6 +167,7 @@ export function RecordForm({ kind, initial, onDone, onDelete }: Props) {
               ...base,
               percent: Math.round(p),
               approximate: false,
+              ...(photoFraction != null && Math.round(p) === lastPhotoPercent ? { photo: photoFraction } : {}),
               notes: measuredByPhoto && !base.notes ? 'Medido con foto' : base.notes,
             };
         }
@@ -424,9 +428,10 @@ export function RecordForm({ kind, initial, onDone, onDelete }: Props) {
           <PhotoLevelDialog
             open={photoOpen}
             onClose={() => setPhotoOpen(false)}
-            onResult={(p) => {
+            onResult={(p, f) => {
               setPercent(String(p));
-              setMeasuredByPhoto(true);
+              setPhotoFraction(f);
+              setLastPhotoPercent(p);
             }}
           />
         </>

@@ -3,7 +3,7 @@ import { Camera as NativeCamera, CameraResultType, CameraSource } from '@capacit
 import { Camera, ImageUp } from 'lucide-react';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { fmtKg } from '../../domain/format';
-import { DEFAULT_MARKS, photoPercent } from '../../domain/photoLevel';
+import { DEFAULT_MARKS, photoCalibration, photoKg, windowFraction } from '../../domain/photoLevel';
 import { useStore } from '../../store/store';
 import { Dialog } from '../../ui/Dialog';
 import { haptic } from '../../ui/haptics';
@@ -14,9 +14,9 @@ type Marks = Record<Mark, number>;
 
 const KEY = 'pellet-control:photo-marks';
 const MARK_STYLE: Record<Mark, { label: string; line: string; tag: string }> = {
-  full: { label: 'Llena', line: 'bg-olive', tag: 'bg-olive text-paper' },
+  full: { label: 'Visor arriba', line: 'bg-olive', tag: 'bg-olive text-paper' },
   surface: { label: 'Pellet', line: 'bg-amber', tag: 'bg-amber text-ink' },
-  empty: { label: 'Fondo', line: 'bg-rust', tag: 'bg-rust text-paper' },
+  empty: { label: 'Visor abajo', line: 'bg-rust', tag: 'bg-rust text-paper' },
 };
 
 function loadMarks(): Marks {
@@ -45,15 +45,29 @@ function saveMarks(m: Marks) {
  * Las marcas de llena y fondo se recuerdan para la próxima vez (basta con un toque si la foto se hace igual).
  * La foto no se guarda: solo el porcentaje.
  */
-export function PhotoLevelDialog({ open, onClose, onResult }: { open: boolean; onClose: () => void; onResult: (percent: number) => void }) {
+export function PhotoLevelDialog({
+  open,
+  onClose,
+  onResult,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** percent: nivel de la tolva; fraction: posición en el visor (0–1), sirve para calibrar. */
+  onResult: (percent: number, fraction: number) => void;
+}) {
   return (
-    <Dialog open={open} onClose={onClose} title="Nivel con foto" description="Haz una foto de la tolva abierta, desde arriba o de frente, y marca hasta dónde llega el pellet.">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Nivel con foto"
+      description="Haz la foto de frente al visor, a su altura y con el visor entero. Si hace falta, enciende la linterna."
+    >
       {open && <PhotoLevel onClose={onClose} onResult={onResult} />}
     </Dialog>
   );
 }
 
-function PhotoLevel({ onClose, onResult }: { onClose: () => void; onResult: (percent: number) => void }) {
+function PhotoLevel({ onClose, onResult }: { onClose: () => void; onResult: (percent: number, fraction: number) => void }) {
   const { data } = useStore();
   const cap = data.settings.hopperCapacityKg;
   const [url, setUrl] = useState<string | null>(null);
@@ -90,7 +104,10 @@ function PhotoLevel({ onClose, onResult }: { onClose: () => void; onResult: (per
     }
   }
 
-  const percent = photoPercent(marks.full, marks.surface, marks.empty);
+  const fraction = windowFraction(marks.full, marks.surface, marks.empty);
+  const cal = photoCalibration(data);
+  const res = fraction != null ? photoKg(fraction, cal, cap) : null;
+  const percent = res?.percent ?? null;
 
   function pick(file: File | undefined) {
     if (!file) return;
@@ -109,10 +126,10 @@ function PhotoLevel({ onClose, onResult }: { onClose: () => void; onResult: (per
   }
 
   function save() {
-    if (percent == null) return;
+    if (percent == null || fraction == null) return;
     saveMarks(marks);
     haptic.success();
-    onResult(percent);
+    onResult(percent, Math.round(fraction * 1000) / 1000);
     onClose();
   }
 
@@ -141,16 +158,16 @@ function PhotoLevel({ onClose, onResult }: { onClose: () => void; onResult: (per
             onChange={setActive}
             options={[
               { value: 'surface', label: 'Pellet' },
-              { value: 'full', label: 'Llena' },
-              { value: 'empty', label: 'Fondo' },
+              { value: 'full', label: 'Visor ↑' },
+              { value: 'empty', label: 'Visor ↓' },
             ]}
           />
           <p className="text-[0.8125rem] text-ink-2">
             {active === 'surface'
-              ? 'Toca o arrastra sobre la foto hasta la superficie del pellet.'
+              ? 'Toca o arrastra hasta donde se ven los granos. La franja gris de encima es polvo pegado al visor: no cuenta.'
               : active === 'full'
-                ? 'Marca la altura que tendría el pellet con la tolva llena (justo bajo el borde).'
-                : 'Marca el fondo de la tolva (donde está vacía).'}
+                ? 'Marca el extremo de arriba del visor. Se recuerda para la próxima vez.'
+                : 'Marca el extremo de abajo del visor (no hace falta que la tolva esté vacía). Se recuerda.'}
           </p>
 
           <div
@@ -195,9 +212,14 @@ function PhotoLevel({ onClose, onResult }: { onClose: () => void; onResult: (per
           <div className="flex items-baseline justify-between gap-3">
             <p className="num text-3xl font-bold tracking-[-0.02em]">{percent != null ? `${percent} %` : '—'}</p>
             <p className="text-sm text-ink-2">
-              {percent == null ? 'Pon «Llena» por encima de «Fondo».' : cap ? `≈ ${fmtKg(Math.round((cap * percent) / 100))} en la tolva` : ''}
+              {percent == null ? 'Pon «Visor arriba» por encima de «Visor abajo».' : res?.kg != null ? `≈ ${fmtKg(res.kg)} en la tolva` : ''}
             </p>
           </div>
+          <p className={cx('rounded-xl px-3 py-2 text-[0.8125rem]', cal.kgPerWindow != null ? 'bg-olive-soft text-olive-strong' : 'bg-sand-soft text-ink-2')}>
+            {cal.kgPerWindow != null
+              ? `Calibrado con ${cal.pairs} ${cal.pairs === 1 ? 'recarga' : 'recargas'}: el visor abarca unos ${fmtKg(Math.round(cal.kgPerWindow))}.`
+              : 'Sin calibrar: se toma el visor como toda la tolva. Para afinar, haz una foto antes y otra después de tu próxima recarga (con los sacos apuntados) y la app aprenderá los kg del visor.'}
+          </p>
 
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="ghost" icon={<Camera className="size-4" />} onClick={() => void open('camera')}>

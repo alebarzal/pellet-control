@@ -65,6 +65,8 @@ export interface LevelRecord extends BaseRecord {
   percent: number;
   /** true si procede de una estimación visual (lleno/medio/bajo/vacío). */
   approximate: boolean;
+  /** Si se midió con foto: posición del pellet en el visor (0 = abajo, 1 = arriba). Sirve para calibrar. */
+  photo?: number;
 }
 
 /** Recuento absoluto de existencias almacenadas fuera de la tolva. */
