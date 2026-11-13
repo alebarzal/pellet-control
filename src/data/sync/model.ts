@@ -1,4 +1,5 @@
-import type { AppData, MarketProduct, PelletRecord, Settings, TempReading } from '../../domain/types';
+import { MAX_PLUG_READINGS } from '../../domain/plug';
+import type { AppData, MarketProduct, PelletRecord, PlugReading, Settings, TempReading } from '../../domain/types';
 
 /**
  * Traducción entre los datos de la app y las filas de la tabla `items` de Supabase.
@@ -27,6 +28,13 @@ export function sharedSettings(s: Settings): Settings {
 
 export const readingId = (r: TempReading) => `${r.deviceId}|${r.at}`;
 
+/**
+ * Las lecturas del enchufe viajan en la colección «reading» (la tabla solo admite las colecciones de siempre)
+ * con este prefijo en el id, así no hace falta tocar la base de datos.
+ */
+const PLUG_PREFIX = 'plug|';
+export const plugReadingId = (r: PlugReading) => `${PLUG_PREFIX}${r.at}`;
+
 /** JSON con claves ordenadas: la base de datos reordena las claves al guardar. */
 export function stable(v: unknown): string {
   if (v === null || typeof v !== 'object') return JSON.stringify(v ?? null);
@@ -46,6 +54,7 @@ function index(d: AppData): Keyed {
   for (const r of d.records) m.set(`record:${r.id}`, { collection: 'record', id: r.id, data: r });
   for (const p of d.market) m.set(`product:${p.id}`, { collection: 'product', id: p.id, data: p });
   for (const r of d.climate.readings) m.set(`reading:${readingId(r)}`, { collection: 'reading', id: readingId(r), data: r });
+  for (const r of d.climate.plug ?? []) m.set(`reading:${plugReadingId(r)}`, { collection: 'reading', id: plugReadingId(r), data: { at: r.at, watts: r.watts } });
   m.set('settings:settings', { collection: 'settings', id: 'settings', data: sharedSettings(d.settings) });
   return m;
 }
@@ -74,6 +83,8 @@ export function applyRemote(d: AppData, items: SyncItem[]): AppData {
   const records = new Map(d.records.map((r) => [r.id, r]));
   const market = new Map(d.market.map((p) => [p.id, p]));
   const readings = new Map(d.climate.readings.map((r) => [readingId(r), r]));
+  const plug = new Map((d.climate.plug ?? []).map((r) => [plugReadingId(r), r]));
+  const plugBefore = plug.size;
   let settings = d.settings;
   for (const it of items) {
     switch (it.collection) {
@@ -86,7 +97,11 @@ export function applyRemote(d: AppData, items: SyncItem[]): AppData {
         else market.set(it.id, it.data as MarketProduct);
         break;
       case 'reading':
-        if (!it.deleted && !readings.has(it.id)) readings.set(it.id, it.data as TempReading);
+        if (it.deleted) break;
+        if (it.id.startsWith(PLUG_PREFIX)) {
+          const p = it.data as PlugReading | null;
+          if (p && typeof p.watts === 'number' && !plug.has(it.id)) plug.set(it.id, { at: p.at, watts: p.watts });
+        } else if (!readings.has(it.id)) readings.set(it.id, it.data as TempReading);
         break;
       case 'settings':
         if (!it.deleted && it.data) {
@@ -111,11 +126,17 @@ export function applyRemote(d: AppData, items: SyncItem[]): AppData {
     settings,
     records: [...records.values()],
     market: [...market.values()],
-    climate: { ...d.climate, readings: [...readings.values()].sort((x, y) => (x.at < y.at ? -1 : 1)) },
+    climate: {
+      ...d.climate,
+      readings: [...readings.values()].sort((x, y) => (x.at < y.at ? -1 : 1)),
+      ...(plug.size !== plugBefore
+        ? { plug: [...plug.values()].sort((x, y) => (x.at < y.at ? -1 : 1)).slice(-MAX_PLUG_READINGS) }
+        : {}),
+    },
   };
 }
 
 /** Datos vacíos de un hogar al que uno se une (conserva credenciales y avisos de este móvil). */
 export function emptyFrom(d: AppData): AppData {
-  return { ...d, records: [], market: [], climate: { ...d.climate, readings: [] } };
+  return { ...d, records: [], market: [], climate: { ...d.climate, readings: [], plug: [] } };
 }

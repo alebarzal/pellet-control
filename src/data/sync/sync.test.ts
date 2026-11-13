@@ -157,3 +157,21 @@ describe('sincronización entre móviles', () => {
     expect(b.data.climate.readings).toHaveLength(1);
   });
 });
+
+describe('enchufe compartido', () => {
+  it('las lecturas del enchufe de un móvil llegan al otro del hogar, sin las claves', () => {
+    const base = emptyFrom(createSeedData());
+    const a: AppData = {
+      ...base,
+      settings: { ...base.settings, climate: { ...base.settings.climate, plugId: 'P1', switchbotToken: 'tok', switchbotSecret: 'sec' } },
+    };
+    const a2: AppData = { ...a, climate: { ...a.climate, plug: [{ at: '2026-11-13T16:00:00.000Z', watts: 53 }] } };
+    const changes = diff(a, a2);
+    expect(changes.some((c) => c.collection === 'reading' && c.id.startsWith('plug|'))).toBe(true);
+    const b = applyRemote(emptyFrom(createSeedData()), allItems(a2));
+    expect(b.climate.plug).toEqual([{ at: '2026-11-13T16:00:00.000Z', watts: 53 }]);
+    expect(b.climate.readings).toEqual([]);
+    expect(b.settings.climate.plugId).toBe('P1');
+    expect(b.settings.climate.switchbotToken).not.toBe('tok');
+  });
+});

@@ -10,6 +10,7 @@ import { decimalToInput, parseDecimal, StepperInput, TextInput } from '../../ui/
 import { Button, Card, cx, SectionTitle, Segmented } from '../../ui/primitives';
 import { useToast } from '../../ui/Toast';
 import { useClimateSync } from './ClimateSync';
+import { useSync } from '../sync/SyncProvider';
 
 export function ClimateSettingsCard() {
   const { data, updateClimateSettings } = useStore();
@@ -29,6 +30,11 @@ export function ClimateSettingsCard() {
   const [sbErr, setSbErr] = useState('');
   const latest = latestReadings(data.climate.readings);
   const connected = !!c.switchbotToken && c.devices.length > 0;
+  const { config: household } = useSync();
+  // En un hogar compartido, otro móvil ya lee SwitchBot y sus lecturas llegan aquí.
+  const fromHousehold = !connected && !!household && (c.devices.length > 0 || !!c.plugId);
+  const [ownKeys, setOwnKeys] = useState(false);
+  const askKeys = !connected && (!fromHousehold || ownKeys);
 
   async function search() {
     setSearching(true);
@@ -195,14 +201,26 @@ export function ClimateSettingsCard() {
             </Button>
           )}
         </div>
-        {!connected && (
+        {fromHousehold && !ownKeys && (
+          <div className="flex flex-col gap-2 rounded-2xl bg-olive-soft/60 p-4 text-sm text-ink-2">
+            <p>
+              <span className="font-semibold text-ink">Las lecturas llegan del hogar.</span> Otro móvil del hogar tiene SwitchBot conectado y comparte
+              las temperaturas{c.plugId ? ' y el enchufe de la caldera' : ''}. No hace falta poner las claves en este móvil.
+            </p>
+            <p className="text-[0.8125rem] text-ink-3">Los sensores, el enchufe y el umbral se eligen desde ese móvil y se aplican a los dos.</p>
+            <button type="button" onClick={() => setOwnKeys(true)} className="self-start text-[0.8125rem] font-semibold text-olive-strong underline underline-offset-2">
+              Conectar SwitchBot también en este móvil
+            </button>
+          </div>
+        )}
+        {askKeys && (
           <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-2">
             <li>En la app de SwitchBot: Perfil → Preferencias → Acerca de.</li>
             <li>Pulsa 10 veces sobre la versión de la app: aparecen las Opciones de desarrollador.</li>
             <li>Copia el token y la clave secreta y pégalos aquí.</li>
           </ol>
         )}
-        {!connected && (
+        {askKeys && (
           <form
             className="flex flex-col gap-3"
             onSubmit={(e) => {
