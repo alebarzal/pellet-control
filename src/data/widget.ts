@@ -26,7 +26,8 @@ export interface WidgetPayload {
   plugAt?: number;
 }
 
-export type WidgetAction = 'purchase' | 'refill';
+/** Botones del widget y atajos del icono de la app. */
+export type WidgetAction = 'purchase' | 'refill' | 'consumption' | 'level';
 
 interface PelletWidgetPlugin {
   update(o: WidgetPayload): Promise<void>;
@@ -69,7 +70,8 @@ export async function updateWidget(data: AppData) {
   }
 }
 
-const asAction = (a: string | null | undefined): WidgetAction | null => (a === 'purchase' || a === 'refill' ? a : null);
+const asAction = (a: string | null | undefined): WidgetAction | null =>
+  a === 'purchase' || a === 'refill' || a === 'consumption' || a === 'level' ? a : null;
 
 /** Escucha los botones del widget: la acción con la que se abrió la app y las que lleguen después. */
 export function onWidgetAction(cb: (a: WidgetAction) => void): () => void {

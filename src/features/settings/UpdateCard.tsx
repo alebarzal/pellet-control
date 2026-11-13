@@ -1,6 +1,8 @@
-import { CloudDownload } from 'lucide-react';
-import { useState } from 'react';
-import { BUILD_SHA, BUILD_TIME, checkUpdate, installUpdate, updaterAvailable, type PublishedBuild } from '../../data/update';
+import { CloudDownload, Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { APP_VERSION } from '../../data/changelog';
+import { BUILD_SHA, BUILD_TIME, checkUpdate, installUpdate, setAvailableUpdate, takeAutoInstall, updaterAvailable, type PublishedBuild } from '../../data/update';
+import { openWhatsNew } from './WhatsNew';
 import { Button, SectionTitle } from '../../ui/primitives';
 import { useToast } from '../../ui/Toast';
 
@@ -11,12 +13,21 @@ const when = (iso: string) => {
 
 type Phase = { k: 'idle' } | { k: 'checking' } | { k: 'downloading'; percent: number } | { k: 'done'; text: string };
 
-/** Actualiza la app con el APK que GitHub compila en cada push. Solo en Android. */
+/** Versión instalada, novedades y (en Android) actualizar con el APK que GitHub compila en cada push. */
 export function UpdateCard() {
   const toast = useToast();
   const [phase, setPhase] = useState<Phase>({ k: 'idle' });
   const [found, setFound] = useState<PublishedBuild | null>(null);
-  if (!updaterAvailable()) return null;
+  const ref = useRef<HTMLDivElement>(null);
+  const canUpdate = updaterAvailable();
+
+  // Viniendo del aviso de Inicio: se baja hasta aquí y se empieza a actualizar.
+  useEffect(() => {
+    if (!canUpdate || !takeAutoInstall()) return;
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function run() {
     try {
@@ -24,6 +35,7 @@ export function UpdateCard() {
       const c = await checkUpdate();
       if (c.state === 'current') {
         setFound(null);
+        setAvailableUpdate(null);
         setPhase({ k: 'done', text: 'Ya tienes la última versión.' });
         return;
       }
@@ -50,13 +62,17 @@ export function UpdateCard() {
 
   const busy = phase.k === 'checking' || phase.k === 'downloading';
   return (
-    <>
-      <SectionTitle>Actualizaciones</SectionTitle>
+    <div ref={ref}>
+      <SectionTitle>Versión y novedades</SectionTitle>
       <p className="text-sm text-ink-2">
-        Versión instalada: <span className="font-semibold tabular-nums">{BUILD_SHA ? BUILD_SHA.slice(0, 7) : 'desconocida'}</span>
+        Versión <span className="font-semibold tabular-nums">{APP_VERSION}</span>
+        {BUILD_SHA && <span className="tabular-nums"> · {BUILD_SHA.slice(0, 7)}</span>}
         {BUILD_TIME && ` · ${when(BUILD_TIME)}`}
       </p>
-      <div className="mt-3 flex flex-col gap-3">
+      <Button size="sm" icon={<Sparkles className="size-4" />} onClick={openWhatsNew} className="mt-3">
+        Ver novedades
+      </Button>
+      {canUpdate && <div className="mt-4 flex flex-col gap-3 border-t border-line pt-4">
         <Button variant="primary" icon={<CloudDownload className="size-4" />} loading={busy} onClick={() => void run()} className="self-start">
           {phase.k === 'checking' ? 'Buscando…' : phase.k === 'downloading' ? (phase.percent >= 0 ? `Descargando ${phase.percent} %` : 'Descargando…') : 'Actualizar desde GitHub'}
         </Button>
@@ -77,8 +93,8 @@ export function UpdateCard() {
             {phase.text}
           </p>
         )}
-        <p className="text-[0.8125rem] text-ink-3">Descarga la versión del último cambio subido a GitHub y abre el instalador de Android.</p>
-      </div>
-    </>
+        <p className="text-[0.8125rem] text-ink-3">Descarga la versión del último cambio subido a GitHub y abre el instalador de Android. Al abrir la app se mira sola cada pocas horas.</p>
+      </div>}
+    </div>
   );
 }

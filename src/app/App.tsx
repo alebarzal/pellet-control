@@ -23,6 +23,9 @@ import { haptic } from '../ui/haptics';
 import { ToastProvider } from '../ui/Toast';
 import { ROUTES, useRoute, type Route } from './router';
 import { BackButtonHandler } from '../features/back/BackButton';
+import { WhatsNew } from '../features/settings/WhatsNew';
+import { checkUpdateQuietly } from '../data/update';
+import { useEffect } from 'react';
 
 function Logo({ light }: { light?: boolean }) {
   return (
@@ -176,6 +179,13 @@ function MobileNav({ route, go }: { route: Route; go: (r: Route) => void }) {
 
 function Shell() {
   const [route, go] = useRoute();
+  // Al abrir (y al volver a la app) se mira si hay versión nueva; la función ya limita la frecuencia.
+  useEffect(() => {
+    void checkUpdateQuietly();
+    const on = () => document.visibilityState === 'visible' && void checkUpdateQuietly();
+    document.addEventListener('visibilitychange', on);
+    return () => document.removeEventListener('visibilitychange', on);
+  }, []);
   const Page = {
     inicio: DashboardPage,
     inventario: InventoryPage,
@@ -204,6 +214,7 @@ function Shell() {
       </div>
       <MobileNav route={route} go={go} />
       <BackButtonHandler route={route} go={go} />
+      <WhatsNew />
     </div>
   );
 }

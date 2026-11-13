@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Atajos del icono: abren la app con el formulario, igual que los botones del widget. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="purchase"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_purchase"
+        android:shortcutLongLabel="@string/shortcut_purchase_long">
+        <intent
+            android:action="es.pelletcontrol.app.WIDGET_PURCHASE"
+            android:targetPackage="es.pelletcontrol.app"
+            android:targetClass="es.pelletcontrol.app.MainActivity">
+            <extra android:name="pc_widget_action" android:value="purchase" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="refill"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_refill"
+        android:shortcutLongLabel="@string/shortcut_refill_long">
+        <intent
+            android:action="es.pelletcontrol.app.WIDGET_REFILL"
+            android:targetPackage="es.pelletcontrol.app"
+            android:targetClass="es.pelletcontrol.app.MainActivity">
+            <extra android:name="pc_widget_action" android:value="refill" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="consumption"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_consumption"
+        android:shortcutLongLabel="@string/shortcut_consumption_long">
+        <intent
+            android:action="es.pelletcontrol.app.WIDGET_CONSUMPTION"
+            android:targetPackage="es.pelletcontrol.app"
+            android:targetClass="es.pelletcontrol.app.MainActivity">
+            <extra android:name="pc_widget_action" android:value="consumption" />
+        </intent>
+    </shortcut>
+</shortcuts>

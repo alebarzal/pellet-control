@@ -1,4 +1,5 @@
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
+import { useSyncExternalStore } from 'react';
 
 /** Commit con el que se compiló esta app y cuándo (los pone Vite al compilar). */
 declare const __BUILD_SHA__: string;
@@ -94,5 +95,68 @@ export async function installUpdate(build: PublishedBuild, onProgress: (percent:
     return (await Plugin.install({ url: build.url, sha: build.sha })).status;
   } finally {
     void h.remove();
+  }
+}
+
+/* ── Comprobación al abrir la app ── */
+
+const CHECKED_KEY = 'pellet-control:update-checked';
+const AUTO_KEY = 'pellet-control:auto-update';
+/** Como mucho una consulta a GitHub cada 3 horas (GitHub limita las consultas sin cuenta). */
+const CHECK_EVERY_MS = 3 * 3600_000;
+
+let available: PublishedBuild | null = null;
+const listeners = new Set<() => void>();
+
+/** APK nuevo encontrado al abrir la app (null si no hay o aún no se ha mirado). */
+export function useAvailableUpdate(): PublishedBuild | null {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+    () => available,
+  );
+}
+
+export function setAvailableUpdate(b: PublishedBuild | null) {
+  available = b;
+  listeners.forEach((l) => l());
+}
+
+/** Mira en segundo plano si hay versión nueva. Silenciosa: sin red o sin respuesta no avisa de nada. */
+export async function checkUpdateQuietly(now = Date.now()): Promise<void> {
+  if (!updaterAvailable() || !BUILD_SHA) return;
+  try {
+    const last = Number(localStorage.getItem(CHECKED_KEY) ?? 0);
+    if (now - last < CHECK_EVERY_MS) return;
+    localStorage.setItem(CHECKED_KEY, String(now));
+  } catch {
+    /* sin almacenamiento: se mira igual */
+  }
+  try {
+    const c = await checkUpdate();
+    setAvailableUpdate(c.state === 'available' ? c.build : null);
+  } catch {
+    /* sin conexión */
+  }
+}
+
+/** El aviso de Inicio pide a Configuración que empiece a actualizar nada más abrirse. */
+export function requestAutoInstall() {
+  try {
+    sessionStorage.setItem(AUTO_KEY, '1');
+  } catch {
+    /* ignorado */
+  }
+}
+
+export function takeAutoInstall(): boolean {
+  try {
+    const v = sessionStorage.getItem(AUTO_KEY) === '1';
+    sessionStorage.removeItem(AUTO_KEY);
+    return v;
+  } catch {
+    return false;
   }
 }

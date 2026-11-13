@@ -8,7 +8,6 @@ import { saveFile } from '../data/files';
 import { HopperStatus } from '../features/hopper/HopperStatus';
 import { HapticsSetting } from '../features/settings/HapticsSetting';
 import { UpdateCard } from '../features/settings/UpdateCard';
-import { updaterAvailable } from '../data/update';
 import { CalendarSettings } from '../features/calendar/CalendarSettings';
 import { exportData, parseImport } from '../data/repository';
 import { isValidIso, todayIso } from '../domain/dates';
@@ -192,11 +191,9 @@ export function SettingsPage(_: PageProps) {
           <Card>
             <HapticsSetting />
           </Card>
-          {updaterAvailable() && (
-            <Card>
-              <UpdateCard />
-            </Card>
-          )}
+          <Card>
+            <UpdateCard />
+          </Card>
           <Card>
             <SectionTitle>Tus datos</SectionTitle>
             <p className="text-sm text-ink-2">Se guardan en este navegador. Descarga una copia de vez en cuando o para pasarlos a otro dispositivo.</p>

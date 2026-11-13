@@ -1,4 +1,6 @@
-import { ArrowRight, CalendarClock, CloudSun, Flame, Home, Package, Pencil, Plus, Tag, Wallet } from 'lucide-react';
+import { ArrowRight, CalendarClock, CloudDownload, CloudSun, Flame, Home, Package, Pencil, Plus, ShoppingBag, Tag, TriangleAlert, Wallet } from 'lucide-react';
+import { requestAutoInstall, useAvailableUpdate } from '../data/update';
+import { useCalendarPrefs } from '../data/calendar';
 import { climateForecast, currentIndoor, currentOutdoor, efficiencyModel, MIN_DAYS_FOR_MODEL } from '../domain/climate';
 import type { ReactNode } from 'react';
 import type { PageProps } from '../app/App';
@@ -131,6 +133,10 @@ export function DashboardPage({ go }: PageProps) {
   const fc = climateForecast(data, 7, today);
   const climateOn = data.settings.climate.lat != null || data.settings.climate.devices.length > 0;
   const fmtC = (v: number) => `${v.toLocaleString('es-ES', { maximumFractionDigits: 1 })}°`;
+  const update = useAvailableUpdate();
+  const leadDays = useCalendarPrefs().leadDays;
+  // Pellet para menos días que el margen de compra (el mismo que usa el aviso del calendario).
+  const low = auto && auto.days <= leadDays ? auto : null;
 
   return (
     <>
@@ -143,6 +149,44 @@ export function DashboardPage({ go }: PageProps) {
           Añadir movimiento
         </Button>
       </header>
+
+      {(update || low) && (
+        <div className="mb-4 flex flex-col gap-3">
+          {update && (
+            <div className="flex items-center gap-3 rounded-2xl bg-olive-soft px-4 py-3 text-forest ring-1 ring-olive/20 ring-inset">
+              <CloudDownload className="size-5 shrink-0" aria-hidden />
+              <p className="min-w-0 flex-1 text-sm">
+                <span className="block font-semibold">Hay una versión nueva</span>
+                <span className="block truncate text-forest/80">{update.title}</span>
+              </p>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => {
+                  requestAutoInstall();
+                  go('configuracion');
+                }}
+              >
+                Actualizar
+              </Button>
+            </div>
+          )}
+          {low && (
+            <div className="flex items-center gap-3 rounded-2xl bg-amber-soft px-4 py-3 text-amber ring-1 ring-amber/20 ring-inset">
+              <TriangleAlert className="size-5 shrink-0" aria-hidden />
+              <p className="min-w-0 flex-1 text-sm">
+                <span className="block font-semibold">
+                  {low.days < 1 ? 'Se acaba el pellet hoy' : `Pellet para ${fmtInt(low.days)} ${Math.round(low.days) === 1 ? 'día' : 'días'}`}
+                </span>
+                <span className="block text-ink-2">Al ritmo actual llega hasta el {fmtDate(low.runOutDate)}. Conviene comprar ya.</span>
+              </p>
+              <Button size="sm" icon={<ShoppingBag className="size-4" />} onClick={() => openAdd('purchase')}>
+                Compra
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Instalación */}
       <section aria-label="Instalación" className="grid gap-4 lg:grid-cols-12">

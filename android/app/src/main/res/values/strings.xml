@@ -5,4 +5,10 @@
     <string name="package_name">es.pelletcontrol.app</string>
     <string name="custom_url_scheme">es.pelletcontrol.app</string>
     <string name="widget_description">Sacos, tolva y autonomía, con compra y recarga a un toque</string>
+    <string name="shortcut_purchase">Compra</string>
+    <string name="shortcut_purchase_long">Registrar una compra</string>
+    <string name="shortcut_refill">Recarga</string>
+    <string name="shortcut_refill_long">Recargar la tolva</string>
+    <string name="shortcut_consumption">Consumo</string>
+    <string name="shortcut_consumption_long">Registrar consumo</string>
 </resources>

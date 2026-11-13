@@ -29,7 +29,7 @@ const DESCRIPTIONS: Record<RecordKind, string> = {
 };
 
 export function RecordDialogsProvider({ children }: { children: ReactNode }) {
-  const { data, deleteRecord, restoreRecord } = useStore();
+  const { data, deleteRecord, restoreRecord, updateRecord } = useStore();
   const toast = useToast();
   const [mode, setMode] = useState<{ type: 'add'; kind: RecordKind; quick: boolean } | { type: 'edit'; record: PelletRecord } | null>(null);
   const [toDelete, setToDelete] = useState<PelletRecord | null>(null);
@@ -114,6 +114,11 @@ export function RecordDialogsProvider({ children }: { children: ReactNode }) {
                   toast.show({
                     title: mode.type === 'edit' ? 'Cambios guardados' : done(saved.kind, 'registrad'),
                     body: describeRecord(saved, data.settings).title,
+                    // Por si se ha guardado sin querer: deshacer quita el nuevo o devuelve el registro a como estaba.
+                    action:
+                      mode.type === 'edit'
+                        ? { label: 'Deshacer', onClick: () => updateRecord(mode.record) }
+                        : { label: 'Deshacer', onClick: () => void deleteRecord(saved.id) },
                   });
               }}
             />
