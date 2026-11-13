@@ -67,3 +67,31 @@ describe('grados-día', () => {
     expect(c.sensors).toBe(2);
   });
 });
+
+import { splitBase } from './climate';
+
+describe('agua caliente', () => {
+  it('separa los kg fijos del agua caliente de los que dependen del frío', () => {
+    // 2 kg/día de agua caliente + 1,5 kg por grado-día
+    const p = (days: number, hddSum: number) => ({ days, hdd: hddSum, kg: 2 * days + 1.5 * hddSum });
+    const r = splitBase([p(7, 10), p(7, 50), p(7, 80), p(5, 20)])!;
+    expect(r.base).toBeCloseTo(2);
+    expect(r.k).toBeCloseTo(1.5);
+  });
+  it('sin periodos de frío distinto no separa nada', () => {
+    expect(splitBase([{ days: 7, hdd: 70, kg: 100 }, { days: 14, hdd: 140, kg: 200 }, { days: 7, hdd: 70, kg: 100 }])).toBeNull();
+  });
+  it('con agua caliente puesta a mano, la previsión suma el fijo diario aunque no haga frío', () => {
+    let d = createSeedData();
+    d = {
+      ...d,
+      settings: { ...d.settings, climate: { ...d.settings.climate, dhwKgPerDay: 2 } },
+      records: [...d.records, { id: 'c', kind: 'consumption', date: '2026-11-01', endDate: '2026-11-04', kg: 48, bags: null, notes: '', createdAt: 1e13 }],
+    };
+    d = withWeather(d, [day('2026-11-01', 5), day('2026-11-02', 5), day('2026-11-03', 5), day('2026-11-04', 5), day('2026-11-10', 20)]);
+    const m = efficiencyModel(d, '2026-11-10')!;
+    expect(m.baseKgPerDay).toBe(2);
+    expect(m.kgPerHdd).toBeCloseTo(1); // (48 − 8) / 40
+    expect(climateForecast(d, 7, '2026-11-10')!.days[0].kg).toBe(2);
+  });
+});

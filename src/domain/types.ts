@@ -182,6 +182,8 @@ export interface ClimateSettings {
   lon: number | null;
   /** Temperatura base de los grados-día de calefacción (°C). */
   baseTempC: number;
+  /** kg/día que gasta el agua caliente (lo que se quema aunque no haga frío). Null = calcularlo solo. */
+  dhwKgPerDay?: number | null;
   /** Credenciales de la API de SwitchBot. Solo se guardan en este dispositivo y no se exportan. */
   switchbotToken: string;
   switchbotSecret: string;

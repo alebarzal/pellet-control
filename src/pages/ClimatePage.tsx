@@ -136,7 +136,13 @@ export function ClimatePage({ go }: PageProps) {
           <Stat
             label="Pellet por grado-día"
             value={model ? `${fmtNum(model.kgPerHdd)} kg` : '—'}
-            hint={model ? `Con ${model.days} días de consumo real` : `Necesita ${MIN_DAYS_FOR_MODEL} días con consumo y temperatura`}
+            hint={
+              model
+                ? model.baseSource === 'none'
+                  ? `Con ${model.days} días de consumo real (incluye el agua caliente)`
+                  : `Calefacción. Agua caliente aparte: ≈ ${fmtNum(model.baseKgPerDay)} kg/día${model.baseSource === 'manual' ? ' (puesto a mano)' : ''}`
+                : `Necesita ${MIN_DAYS_FOR_MODEL} días con consumo y temperatura`
+            }
             tone={model ? undefined : 'muted'}
           />
           <Stat label="Grados-día esta temporada" value={history.length ? fmtInt(seasonHdd) : '—'} hint={`Base ${fmtC(c.baseTempC)} · desde ${fmtDate(data.settings.seasonStart)}`} tone={history.length ? undefined : 'muted'} />

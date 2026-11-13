@@ -24,6 +24,8 @@ export function ClimateSettingsCard() {
   const [placeErr, setPlaceErr] = useState('');
 
   const [baseStr, setBaseStr] = useState(decimalToInput(c.baseTempC));
+  const dhwManual = c.dhwKgPerDay != null;
+  const [dhwStr, setDhwStr] = useState(decimalToInput(c.dhwKgPerDay ?? 2));
   const [token, setToken] = useState(c.switchbotToken);
   const [secret, setSecret] = useState(c.switchbotSecret);
   const [connecting, setConnecting] = useState(false);
@@ -189,6 +191,42 @@ export function ClimateSettingsCard() {
           hint="Por debajo de esta temperatura exterior media se considera que hace falta calefacción (en España se suele usar 15 °C)."
           className="max-w-xs"
         />
+        <div className="flex flex-col gap-3">
+          <Segmented
+            size="sm"
+            label="Agua caliente"
+            value={dhwManual ? 'mano' : 'auto'}
+            onChange={(v) => {
+              if (v === 'auto') updateClimateSettings({ dhwKgPerDay: null });
+              else {
+                const n = parseDecimal(dhwStr);
+                updateClimateSettings({ dhwKgPerDay: Number.isFinite(n) && n >= 0 ? n : 2 });
+              }
+            }}
+            options={[
+              { value: 'auto', label: 'Calcular sola' },
+              { value: 'mano', label: 'Poner a mano' },
+            ]}
+          />
+          {dhwManual && (
+            <StepperInput
+              label="Pellet del agua caliente"
+              unit="kg/día"
+              step={0.5}
+              value={dhwStr}
+              onChange={(v) => {
+                setDhwStr(v);
+                const n = parseDecimal(v);
+                if (Number.isFinite(n) && n >= 0 && n <= 30) updateClimateSettings({ dhwKgPerDay: n });
+              }}
+              className="max-w-xs"
+            />
+          )}
+          <p className="text-[0.8125rem] text-ink-3">
+            La caldera también calienta el agua de casa, y eso gasta pellet aunque no haga frío. La app lo separa del consumo de calefacción para que la previsión no
+            dé cero los días templados. {dhwManual ? 'Un buen valor es lo que gastas al día en verano.' : 'Lo calcula sola cuando tenga consumos de semanas con frío distinto.'}
+          </p>
+        </div>
       </div>
 
       {/* SwitchBot */}

@@ -112,6 +112,7 @@ export function buildSheets(data: AppData, today = todayIso()): Sheet[] {
       kv('Localidad', s(climate.placeName || null)),
       kv('Grados-día de la temporada', n(outdoor.size ? seasonHdd : null, INT), `Base ${climate.baseTempC} °C`),
       kv('Kg de pellet por grado-día', n(model?.kgPerHdd ?? null, '#,##0.00'), model ? `${model.days} días de datos` : 'Necesita 3 días de consumo real'),
+      kv('Kg de pellet al día para agua caliente', n(model && model.baseSource !== 'none' ? model.baseKgPerDay : null, '#,##0.00'), model?.baseSource === 'manual' ? 'Puesto a mano' : model?.baseSource === 'auto' ? 'Calculado con los consumos' : 'Aún sin separar'),
       kv('Arranques detectados (estimación)', n(episodes.length, INT), 'Por la temperatura interior'),
     ],
   });

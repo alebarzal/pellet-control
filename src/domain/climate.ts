@@ -1,5 +1,5 @@
-import { consumptionStats, dailyConsumption, hopperEstimate, statsData, storedStock } from './calc';
-import { todayIso } from './dates';
+import { consumptionPeriods, consumptionStats, dailyConsumption, hopperEstimate, statsData, storedStock } from './calc';
+import { addDays, diffDays, todayIso } from './dates';
 import type { AppData, OutdoorDay, TempReading } from './types';
 
 /** Grados-día de calefacción de un día: cuántos grados por debajo de la base estuvo la media exterior. */
@@ -10,8 +10,12 @@ export function outdoorByDate(data: AppData): Map<string, OutdoorDay> {
 }
 
 export interface EfficiencyModel {
-  /** kg de pellet por grado-día. */
+  /** kg de pellet por grado-día (solo calefacción). */
   kgPerHdd: number;
+  /** kg/día fijos (agua caliente y pérdidas), se gastan aunque no haga frío. */
+  baseKgPerDay: number;
+  /** De dónde sale baseKgPerDay: puesto a mano, calculado con los datos o sin separar todavía. */
+  baseSource: 'manual' | 'auto' | 'none';
   /** Días con consumo y temperatura usados. */
   days: number;
   totalKg: number;
@@ -21,9 +25,54 @@ export interface EfficiencyModel {
 /** Mínimo de días con consumo y temperatura para estimar kg/grado-día. */
 export const MIN_DAYS_FOR_MODEL = 3;
 
+/** Periodos con consumo conocido y temperatura de todos sus días: kg, días y grados-día. */
+function periodSamples(data: AppData, today: string): { kg: number; days: number; hdd: number }[] {
+  const temps = outdoorByDate(data);
+  const base = data.settings.climate.baseTempC;
+  const out: { kg: number; days: number; hdd: number }[] = [];
+  for (const p of consumptionPeriods(statsData(data))) {
+    const first = p.source === 'inventario' && p.end > p.start ? addDays(p.start, 1) : p.start;
+    if (p.end > today) continue;
+    const n = diffDays(first, p.end) + 1;
+    let h = 0;
+    let ok = true;
+    for (let i = 0; i < n && ok; i++) {
+      const t = temps.get(addDays(first, i));
+      if (!t) ok = false;
+      else h += hdd(t.mean, base);
+    }
+    if (ok && n > 0 && p.kg > 0) out.push({ kg: p.kg, days: n, hdd: h });
+  }
+  return out;
+}
+
 /**
- * Relación consumo / frío: kg por grado-día, a partir de los días con consumo real
- * y temperatura exterior conocida. No se calcula si faltan datos.
+ * Separa el consumo fijo (agua caliente) del que depende del frío: kg = base·días + k·grados-día.
+ * Con periodos de frío distinto se ajusta por mínimos cuadrados; si los datos no lo permiten
+ * todavía, todo se atribuye al frío (como antes). Devuelve null si el ajuste no es fiable.
+ */
+export function splitBase(samples: { kg: number; days: number; hdd: number }[]): { base: number; k: number } | null {
+  if (samples.length < 3) return null;
+  let dd = 0, dh = 0, hh = 0, dk = 0, hk = 0;
+  for (const s of samples) {
+    dd += s.days * s.days;
+    dh += s.days * s.hdd;
+    hh += s.hdd * s.hdd;
+    dk += s.days * s.kg;
+    hk += s.hdd * s.kg;
+  }
+  const det = dd * hh - dh * dh;
+  // Hace falta que los periodos tengan un frío medio bastante distinto entre sí.
+  if (det <= 0 || det < 0.05 * dd * hh) return null;
+  const base = (dk * hh - hk * dh) / det;
+  const k = (dd * hk - dh * dk) / det;
+  if (!(base >= 0) || !(k > 0)) return null;
+  return { base, k };
+}
+
+/**
+ * Relación consumo / frío: kg por grado-día (y kg/día fijos del agua caliente), a partir de los días
+ * con consumo real y temperatura exterior conocida. No se calcula si faltan datos.
  */
 export function efficiencyModel(data: AppData, today = todayIso()): EfficiencyModel | null {
   const temps = outdoorByDate(data);
@@ -39,8 +88,17 @@ export function efficiencyModel(data: AppData, today = todayIso()): EfficiencyMo
     totalHdd += hdd(t.mean, base);
     days++;
   }
-  if (days < MIN_DAYS_FOR_MODEL || totalHdd < 1 || totalKg <= 0) return null;
-  return { kgPerHdd: totalKg / totalHdd, days, totalKg, totalHdd };
+  if (days < MIN_DAYS_FOR_MODEL || totalKg <= 0) return null;
+
+  const manual = data.settings.climate.dhwKgPerDay;
+  if (manual != null && manual >= 0) {
+    const heatKg = Math.max(0, totalKg - manual * days);
+    return { kgPerHdd: totalHdd >= 1 ? heatKg / totalHdd : 0, baseKgPerDay: manual, baseSource: 'manual', days, totalKg, totalHdd };
+  }
+  const fit = splitBase(periodSamples(data, today));
+  if (fit) return { kgPerHdd: fit.k, baseKgPerDay: fit.base, baseSource: 'auto', days, totalKg, totalHdd };
+  if (totalHdd < 1) return null;
+  return { kgPerHdd: totalKg / totalHdd, baseKgPerDay: 0, baseSource: 'none', days, totalKg, totalHdd };
 }
 
 export interface ForecastDay {
@@ -77,7 +135,7 @@ export function climateForecast(data: AppData, horizon = 7, today = todayIso()):
   let runOutDate: string | null = null;
   const days = future.map((d) => {
     const h = hdd(d.mean, base);
-    const kg = model ? h * model.kgPerHdd : null;
+    const kg = model ? model.baseKgPerDay + h * model.kgPerHdd : null;
     if (kg != null) {
       acc += kg;
       if (!runOutDate && acc >= availableKg) runOutDate = d.date;

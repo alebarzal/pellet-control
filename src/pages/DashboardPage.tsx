@@ -337,6 +337,7 @@ export function DashboardPage({ go }: PageProps) {
                     <p className="num mt-2 text-[0.9375rem] text-ink-2">
                       {fc.totalCost != null && <>≈ {fmtEur(fc.totalCost)} · </>}
                       {model.kgPerHdd.toLocaleString('es-ES', { maximumFractionDigits: 2 })} kg por grado-día
+                      {model.baseKgPerDay > 0 && <> + {model.baseKgPerDay.toLocaleString('es-ES', { maximumFractionDigits: 1 })} kg/día de agua caliente</>}
                     </p>
                   </>
                 ) : (

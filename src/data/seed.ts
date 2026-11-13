@@ -5,6 +5,7 @@ export const defaultClimateSettings = (): ClimateSettings => ({
   lat: null,
   lon: null,
   baseTempC: 15,
+  dhwKgPerDay: null,
   switchbotToken: '',
   switchbotSecret: '',
   indoorIds: [],
