@@ -1,5 +1,6 @@
-import { addDays, toIso } from './dates';
-import type { ClimateSettings, PlugReading } from './types';
+import { consumptionPeriods, statsData } from './calc';
+import { addDays, diffDays, toIso } from './dates';
+import type { AppData, ClimateSettings, PlugReading } from './types';
 
 /** Lecturas de enchufe que se guardan (≈ 50 días a una cada 15 min). */
 export const MAX_PLUG_READINGS = 5000;
@@ -52,14 +53,68 @@ export function burnerMinutesByDay(readings: PlugReading[], thresholdW: number, 
   return out;
 }
 
-export function plugSummary(readings: PlugReading[] | undefined, c: ClimateSettings, now = Date.now()): PlugSummary {
+/** Un día cuenta para calibrar si el enchufe tiene casi todas sus lecturas (≈ 18 h de 24). */
+const MIN_SAMPLES_PER_DAY = 72;
+
+export interface KgPerHour {
+  value: number;
+  source: 'manual' | 'auto';
+  /** Días usados para calcularlo (solo si es automático). */
+  days: number;
+}
+
+/**
+ * kg por hora de quemador cruzando los consumos apuntados (o deducidos del inventario) con las horas
+ * de quemador que midió el enchufe esos mismos días. Solo usa periodos con el enchufe midiendo todos los días.
+ */
+export function autoKgPerBurnerHour(data: AppData, now = Date.now()): { value: number; days: number } | null {
+  const c = data.settings.climate;
+  const readings = data.climate.plug ?? [];
+  if (!c.plugId || readings.length < MIN_SAMPLES_PER_DAY) return null;
+  const byDay = burnerMinutesByDay(readings, c.plugThresholdW, now);
+  const today = toIso(new Date(now));
+  let kg = 0;
+  let minutes = 0;
+  let days = 0;
+  for (const p of consumptionPeriods(statsData(data))) {
+    const first = p.source === 'inventario' && p.end > p.start ? addDays(p.start, 1) : p.start;
+    if (p.end >= today) continue; // el día de hoy aún no ha terminado
+    const n = diffDays(first, p.end) + 1;
+    let m = 0;
+    let ok = n > 0;
+    for (let i = 0; i < n && ok; i++) {
+      const d = byDay.get(addDays(first, i));
+      if (!d || d.samples < MIN_SAMPLES_PER_DAY) ok = false;
+      else m += d.minutes;
+    }
+    if (!ok) continue;
+    kg += p.kg;
+    minutes += m;
+    days += n;
+  }
+  if (minutes < 120 || kg <= 0) return null;
+  const v = kg / (minutes / 60);
+  // Una caldera doméstica de pellet quema entre medio kilo y unos 8 kg por hora.
+  if (v < 0.3 || v > 8) return null;
+  return { value: Math.round(v * 100) / 100, days };
+}
+
+/** kg por hora que se usan: los puestos a mano o, si no hay, los calculados. */
+export function kgPerBurnerHour(data: AppData, now = Date.now()): KgPerHour | null {
+  const manual = data.settings.climate.kgPerBurnerHour;
+  if (manual != null) return { value: manual, source: 'manual', days: 0 };
+  const auto = autoKgPerBurnerHour(data, now);
+  return auto ? { ...auto, source: 'auto' } : null;
+}
+
+export function plugSummary(readings: PlugReading[] | undefined, c: ClimateSettings, now = Date.now(), kgPerHour: number | null = c.kgPerBurnerHour): PlugSummary {
   const list = readings ?? [];
   const byDay = burnerMinutesByDay(list, c.plugThresholdW, now);
   const today = toIso(new Date(now));
   const day = (date: string): BurnerDay => {
     const d = byDay.get(date);
     const minutes = Math.round(d?.minutes ?? 0);
-    return { date, minutes, samples: d?.samples ?? 0, kg: c.kgPerBurnerHour != null ? Math.round((minutes / 60) * c.kgPerBurnerHour * 10) / 10 : null };
+    return { date, minutes, samples: d?.samples ?? 0, kg: kgPerHour != null ? Math.round((minutes / 60) * kgPerHour * 10) / 10 : null };
   };
   const last = list.length ? list.reduce((a, b) => (a.at > b.at ? a : b)) : null;
   const fresh = !!last && now - new Date(last.at).getTime() < 40 * 60_000;

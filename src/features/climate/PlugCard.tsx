@@ -1,10 +1,20 @@
 import { Plug, Plus } from 'lucide-react';
 import { addDays, todayIso } from '../../domain/dates';
 import { fmtDateShort, fmtKg } from '../../domain/format';
-import { plugSummary } from '../../domain/plug';
+import { kgPerBurnerHour, plugSummary } from '../../domain/plug';
 import { useStore } from '../../store/store';
 import { Badge, Card, cx, SectionTitle } from '../../ui/primitives';
 import { useToast } from '../../ui/Toast';
+
+/** «hace 5 min», «hace 3 h», «hace 2 días». */
+export const ago = (iso: string, now = Date.now()) => {
+  const m = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60_000));
+  if (m < 1) return 'ahora mismo';
+  if (m < 60) return `hace ${m} min`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `hace ${h} h`;
+  return `hace ${Math.round(h / 24)} días`;
+};
 
 const hm = (min: number) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')} min`);
 
@@ -14,7 +24,8 @@ export function PlugCard() {
   const toast = useToast();
   const c = data.settings.climate;
   if (!c.plugId) return null;
-  const s = plugSummary(data.climate.plug, c);
+  const kgh = kgPerBurnerHour(data);
+  const s = plugSummary(data.climate.plug, c, Date.now(), kgh?.value ?? null);
   const name = c.plugs.find((p) => p.id === c.plugId)?.name ?? 'Enchufe';
   const max = Math.max(60, ...s.week.map((d) => d.minutes));
   const yesterday = addDays(todayIso(), -1);
@@ -47,12 +58,14 @@ export function PlugCard() {
         <div>
           <p className="text-sm text-ink-2">Ahora</p>
           <p className="num text-2xl font-semibold">{s.last ? `${Math.round(s.last.watts)} W` : '—'}</p>
-          <p className="text-[0.8125rem] text-ink-3">{name}</p>
+          <p className="text-[0.8125rem] text-ink-3">{s.last ? `${name} · ${ago(s.last.at)}` : name}</p>
         </div>
         <div>
           <p className="text-sm text-ink-2">Quemador hoy</p>
           <p className="num text-2xl font-semibold">≈ {hm(s.today.minutes)}</p>
-          <p className="text-[0.8125rem] text-ink-3">{s.today.kg != null ? `≈ ${fmtKg(s.today.kg)} de pellet` : 'Calibra los kg/h para ver kg'}</p>
+          <p className="text-[0.8125rem] text-ink-3">{s.today.kg != null
+              ? `≈ ${fmtKg(s.today.kg)} de pellet`
+              : 'Los kg salen solos tras unos días con consumos apuntados'}</p>
         </div>
       </div>
 
@@ -82,7 +95,11 @@ export function PlugCard() {
           <Plus className="size-4" /> Apuntar ayer como consumo ({fmtKg(y.kg)})
         </button>
       )}
-      <p className="mt-3 text-[0.8125rem] text-ink-3">Estimación con una lectura cada 15 minutos: los arranques cortos pueden no verse.</p>
+      <p className="mt-3 text-[0.8125rem] text-ink-3">
+        Estimación con una lectura cada 15 minutos: los arranques cortos pueden no verse.
+        {kgh && ` Calcula ${kgh.value.toLocaleString('es-ES')} kg por hora de quemador ${kgh.source === 'manual' ? '(puesto a mano)' : `(sacado de ${kgh.days} días de consumo)`}.`}
+        {!s.fresh && s.last && ' Si el enchufe lo lee otro móvil del hogar, se actualiza cuando ese móvil abre la app.'}
+      </p>
     </Card>
   );
 }

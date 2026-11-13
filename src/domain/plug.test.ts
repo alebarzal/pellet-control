@@ -43,3 +43,28 @@ describe('enchufe de la caldera', () => {
     expect(s.week).toHaveLength(7);
   });
 });
+
+import { createInitialData } from '../data/seed';
+import { autoKgPerBurnerHour, kgPerBurnerHour } from './plug';
+
+describe('kg por hora de quemador automáticos', () => {
+  it('cruza un consumo apuntado con las horas que midió el enchufe esos días', () => {
+    const d = createInitialData();
+    d.settings.climate = { ...d.settings.climate, plugId: 'P', plugThresholdW: 30 };
+    // 10 y 11 de nov: lecturas cada 15 min; el quemador funciona de 6:00 a 9:00 (3 h al día).
+    const plug = [];
+    for (const day of [10, 11]) {
+      for (let q = 0; q < 96; q++) {
+        const h = Math.floor(q / 4);
+        plug.push({ at: new Date(2026, 10, day, h, (q % 4) * 15).toISOString(), watts: h >= 6 && h < 9 ? 50 : 5 });
+      }
+    }
+    d.climate = { ...d.climate, plug };
+    d.records = [{ id: 'c', kind: 'consumption', date: '2026-11-10', endDate: '2026-11-11', kg: 12, bags: null, notes: '', createdAt: 1 }];
+    const now = new Date(2026, 10, 12, 10).getTime();
+    expect(autoKgPerBurnerHour(d, now)).toEqual({ value: 2, days: 2 }); // 12 kg / 6 h
+    expect(kgPerBurnerHour(d, now)?.source).toBe('auto');
+    d.settings.climate.kgPerBurnerHour = 2.5;
+    expect(kgPerBurnerHour(d, now)).toEqual({ value: 2.5, source: 'manual', days: 0 });
+  });
+});

@@ -1,7 +1,7 @@
 import { Check, Loader2, Plug, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { listDevices, SwitchBotError } from '../../data/switchbot';
-import { plugSummary } from '../../domain/plug';
+import { autoKgPerBurnerHour, plugSummary } from '../../domain/plug';
 import { useStore } from '../../store/store';
 import { decimalToInput, parseDecimal, StepperInput } from '../../ui/fields';
 import { cx } from '../../ui/primitives';
@@ -17,6 +17,7 @@ export function PlugSettings() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [threshold, setThreshold] = useState(decimalToInput(c.plugThresholdW));
+  const auto = c.plugId ? autoKgPerBurnerHour(data) : null;
   const [kgh, setKgh] = useState(c.kgPerBurnerHour != null ? decimalToInput(c.kgPerBurnerHour) : '');
   const s = plugSummary(data.climate.plug, c);
 
@@ -137,8 +138,12 @@ export function PlugSettings() {
             onChange={saveKgh}
             step={0.1}
             unit="kg/h"
-            placeholder="Sin calibrar"
-            hint="Para estimar los kg. Divide los kg consumidos entre las horas de quemador de ese periodo (las horas salen en iConnect). Vacío = solo horas."
+            placeholder={auto ? `Auto: ${decimalToInput(auto.value)}` : 'Automático'}
+            hint={
+              auto
+                ? `Vacío = automático: ahora ${decimalToInput(auto.value)} kg/h, sacado de ${auto.days} días con consumo y enchufe. Pon un valor solo si lo sabes mejor.`
+                : 'Vacío = automático: se calcula solo cruzando tus consumos apuntados con las horas de quemador del enchufe (hacen falta unos días completos).'
+            }
           />
         </>
       )}

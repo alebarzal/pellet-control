@@ -44,7 +44,12 @@ export function RecordForm({ kind, initial, onDone, onDelete }: Props) {
   // Compra
   const [brand, setBrand] = useState<string>(g('brand', s.brands[0] ?? ''));
   const [supplier, setSupplier] = useState<string>(g('supplier', ''));
-  const [bags, setBags] = useState<string>(decimalToInput(g<number | null>('bags', kind === 'purchase' ? null : null)));
+  const [bags, setBags] = useState<string>(() => {
+    if (initial || kind !== 'refill') return decimalToInput(g<number | null>('bags', null));
+    // Recarga nueva: lo normal es echar los mismos sacos que la última vez.
+    const last = [...data.records].filter((r) => r.kind === 'refill' && r.bags != null).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.createdAt - a.createdAt))[0];
+    return decimalToInput(last && last.kind === 'refill' ? last.bags : null);
+  });
   const [price, setPrice] = useState<string>(decimalToInput(g('pricePerBag', s.usualPricePerBag)));
   const [total, setTotal] = useState<string>(decimalToInput(g<number | null>('totalCost', null)));
   const [totalTouched, setTotalTouched] = useState<boolean>(!!initial);
