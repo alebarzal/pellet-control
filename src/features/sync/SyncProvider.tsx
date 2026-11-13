@@ -169,6 +169,17 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   // Sincroniza al abrir, cada minuto, al recuperar la red y al volver a la app.
   useEffect(() => {
     if (!config) return;
+    // Una vez por hogar: sube las lecturas del enchufe guardadas antes de que se compartieran.
+    const flag = `pellet-control:plug-shared:${config.householdId}`;
+    try {
+      if (!localStorage.getItem(flag) && engineRef.current) {
+        const plugItems = allItems(dataRef.current).filter((i) => i.collection === 'reading' && i.id.startsWith('plug|'));
+        engineRef.current.enqueue(plugItems);
+        localStorage.setItem(flag, '1');
+      }
+    } catch {
+      /* sin almacenamiento: se reintentará al volver a abrir */
+    }
     void run();
     const iv = window.setInterval(() => void run(), POLL_MS);
     const onOnline = () => void run();
