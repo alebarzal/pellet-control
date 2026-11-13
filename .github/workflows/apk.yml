@@ -41,7 +41,10 @@ jobs:
         run: |
           test -n "$KEYSTORE_B64" || { echo "Falta el secreto DEBUG_KEYSTORE_B64"; exit 1; }
           mkdir -p "$HOME/.android"
-          echo "$KEYSTORE_B64" | base64 -d > "$HOME/.android/debug.keystore"
+          # Se ignoran saltos de línea y otros caracteres que no sean base64 (según cómo se pegara el secreto).
+          printf '%s' "$KEYSTORE_B64" | base64 -di > "$HOME/.android/debug.keystore" || true
+          echo "Almacén de claves: $(wc -c < "$HOME/.android/debug.keystore") bytes"
+          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android | grep -q 1D:A9:7C:C3:43:4B:4A:FD || { echo "El secreto DEBUG_KEYSTORE_B64 no contiene la clave de firma esperada"; exit 1; }
 
       - name: Compilar
         run: |
