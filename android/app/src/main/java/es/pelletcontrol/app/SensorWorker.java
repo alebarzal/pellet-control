@@ -153,19 +153,15 @@ public class SensorWorker extends Worker {
         return Result.success();
     }
 
-    /** Igual que plugWatts() de la app: power o weight en W, o tensión × corriente (A o mA). */
+    /** Igual que plugWatts() de la app: power en W (Plug Mini EU) o tensión × corriente en mA (US/JP). */
     static Double plugWatts(JSONObject b) {
         if (b == null) return null;
         Object p = b.opt("power");
         if (p instanceof Number) return Math.max(0, ((Number) p).doubleValue());
-        Object w = b.opt("weight");
-        if (w instanceof Number) return Math.max(0, ((Number) w).doubleValue());
         Object v = b.opt("voltage");
         Object i = b.opt("electricCurrent");
         if (v instanceof Number && i instanceof Number) {
-            double amps = ((Number) i).doubleValue();
-            if (amps > 20) amps = amps / 1000.0;
-            return Math.max(0, ((Number) v).doubleValue() * amps);
+            return Math.max(0, ((Number) v).doubleValue() * ((Number) i).doubleValue() / 1000.0);
         }
         return null;
     }

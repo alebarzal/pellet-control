@@ -30,13 +30,12 @@ describe('firma SwitchBot', () => {
 import { plugWatts } from './switchbot';
 
 describe('potencia del enchufe', () => {
-  it('usa power o weight si vienen en vatios', () => {
-    expect(plugWatts({ power: 112.5 })).toBe(112.5);
-    expect(plugWatts({ power: 'on', weight: 48 })).toBe(48);
+  it('Plug Mini (EU): usa power en vatios', () => {
+    expect(plugWatts({ switchStatus: 1, power: 5.6, voltage: 232, electricCurrent: 24, usedElectricity: 0 })).toBe(5.6);
   });
-  it('si no, tensión × corriente (A o mA)', () => {
-    expect(plugWatts({ power: 'on', voltage: 230, electricCurrent: 0.5 })).toBeCloseTo(115);
-    expect(plugWatts({ voltage: 230, electricCurrent: 500 })).toBeCloseTo(115);
+  it('Plug Mini (US/JP): tensión × corriente en mA, sin usar weight (consumo del día)', () => {
+    expect(plugWatts({ power: 'on', voltage: 230, electricCurrent: 500, weight: 4800 })).toBeCloseTo(115);
+    expect(plugWatts({ voltage: 232, electricCurrent: 15 })).toBeCloseTo(3.48);
   });
   it('sin datos de consumo devuelve null', () => {
     expect(plugWatts({ power: 'on' })).toBeNull();

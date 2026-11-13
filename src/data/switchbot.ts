@@ -123,17 +123,17 @@ export async function listThermoDevices(token: string, secret: string): Promise<
 }
 
 /**
- * Potencia instantánea (W) a partir del estado del enchufe. Según el modelo, SwitchBot la da en
- * `power` o en `weight` (Plug Mini, en vatios), o hay que calcularla con tensión × corriente
- * (la corriente llega en amperios o, en algunos modelos, en miliamperios).
+ * Potencia instantánea (W) a partir del estado del enchufe.
+ * Plug Mini (EU): `power` en vatios. Plug Mini (US/JP): no la da; se calcula con tensión (V) ×
+ * corriente (`electricCurrent`, en mA). `weight` no sirve: es el consumo acumulado del día.
  */
 export function plugWatts(b: Record<string, unknown>): number | null {
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
-  const p = num(b.power) ?? num(b.weight);
+  const p = num(b.power);
   if (p != null) return Math.max(0, p);
   const v = num(b.voltage);
   const i = num(b.electricCurrent);
-  if (v != null && i != null) return Math.max(0, v * (i > 20 ? i / 1000 : i));
+  if (v != null && i != null) return Math.max(0, (v * i) / 1000);
   return null;
 }
 
