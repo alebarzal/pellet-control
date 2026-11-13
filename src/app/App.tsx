@@ -80,7 +80,7 @@ function Sidebar({ route, go }: { route: Route; go: (r: Route) => void }) {
 }
 
 /** Barra inferior: dos secciones, botón +, una sección y «Más» (cinco huecos iguales, + en el centro). */
-const MOBILE_MAIN: Route[] = ['inicio', 'inventario', 'precios'];
+const MOBILE_MAIN: Route[] = ['inicio', 'clima', 'precios'];
 
 function NavTab({ active, label, icon: Icon, onClick, popup }: { active: boolean; label: string; icon: LucideIcon; onClick: () => void; popup?: boolean }
 ) {
@@ -120,7 +120,8 @@ function NavTab({ active, label, icon: Icon, onClick, popup }: { active: boolean
 function MobileNav({ route, go }: { route: Route; go: (r: Route) => void }) {
   const { openAdd } = useRecordActions();
   const [more, setMore] = useState(false);
-  const items = ROUTES.filter((r) => MOBILE_MAIN.includes(r.id));
+  // En el orden de MOBILE_MAIN (no en el del menú lateral).
+  const items = MOBILE_MAIN.map((id) => ROUTES.find((r) => r.id === id)!);
   const moreActive = !MOBILE_MAIN.includes(route);
 
   return (
