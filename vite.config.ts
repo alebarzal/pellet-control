@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -63,8 +64,22 @@ function devPriceProxy(): Plugin {
   };
 }
 
+/** Commit del que sale esta compilación: la app lo compara con el último APK publicado en GitHub. */
+function buildSha(): string {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA;
+  try {
+    return execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  } catch {
+    return '';
+  }
+}
+
 export default defineConfig({
   plugins: [react(), tailwindcss(), devPriceProxy()],
+  define: {
+    __BUILD_SHA__: JSON.stringify(buildSha()),
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+  },
   base: './',
   build: {
     chunkSizeWarningLimit: 1200,

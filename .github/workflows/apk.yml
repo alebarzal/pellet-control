@@ -1,0 +1,67 @@
+name: APK
+
+# Compila el APK con cada push a main y lo deja en la release «latest».
+# La app lo descarga desde Configuración → Actualizaciones.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: npm ci
+
+      - run: npm test
+
+      # Misma firma que los APK ya instalados: sin ella Android no deja actualizar encima.
+      - name: Firma
+        env:
+          KEYSTORE_B64: ${{ secrets.DEBUG_KEYSTORE_B64 }}
+        run: |
+          test -n "$KEYSTORE_B64" || { echo "Falta el secreto DEBUG_KEYSTORE_B64"; exit 1; }
+          mkdir -p "$HOME/.android"
+          echo "$KEYSTORE_B64" | base64 -d > "$HOME/.android/debug.keystore"
+
+      - name: Compilar
+        run: |
+          npm run build
+          npx cap sync android
+          cd android
+          sh ./gradlew assembleDebug --no-daemon -q
+          cp app/build/outputs/apk/debug/app-debug.apk ../PelletControl.apk
+
+      - name: Publicar en la release «latest»
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag -f latest
+          git push -f origin latest
+          TITLE="$(git log -1 --pretty=%s)"
+          printf '%s\n\ncommit: %s\n' "$TITLE" "$GITHUB_SHA" > notes.txt
+          if gh release view latest >/dev/null 2>&1; then
+            gh release upload latest PelletControl.apk --clobber
+            gh release edit latest --title "$TITLE" --notes-file notes.txt --latest
+          else
+            gh release create latest PelletControl.apk --title "$TITLE" --notes-file notes.txt --latest
+          fi
