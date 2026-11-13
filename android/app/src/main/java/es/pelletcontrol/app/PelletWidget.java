@@ -66,6 +66,15 @@ public class PelletWidget extends AppWidgetProvider {
         updateAll(context);
     }
 
+    private static final long PLUG_MAX_AGE_MS = 40 * 60_000L;
+
+    /** La tarea en segundo plano guarda aquí la lectura del enchufe de la caldera y repinta el widget. */
+    static void savePlug(Context context, double watts, boolean on) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putFloat("plugW", (float) watts).putBoolean("plugOn", on).putLong("plugAt", System.currentTimeMillis()).apply();
+        updateAll(context);
+    }
+
     static RemoteViews build(Context context) {
         SharedPreferences p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_pellet);
@@ -101,6 +110,16 @@ public class PelletWidget extends AppWidgetProvider {
             v.setTextViewText(R.id.w_hopper, "—");
             v.setViewVisibility(R.id.w_hopper_bar, View.GONE);
             v.setTextViewText(R.id.w_days, "—");
+        }
+
+        // Cabecera: estado del quemador si el enchufe tiene una lectura reciente; si no, el nombre de la app.
+        if (p.contains("plugAt") && System.currentTimeMillis() - p.getLong("plugAt", 0) < PLUG_MAX_AGE_MS) {
+            boolean on = p.getBoolean("plugOn", false);
+            v.setTextViewText(R.id.w_title, on ? "● Quemando · " + Math.round(p.getFloat("plugW", 0)) + " W" : "○ Caldera en reposo");
+            v.setTextColor(R.id.w_title, on ? 0xFFB5651D : 0xFF6B7A36);
+        } else {
+            v.setTextViewText(R.id.w_title, "Pellet Control");
+            v.setTextColor(R.id.w_title, 0xFF6B7A36);
         }
 
         String temps = temps(p);

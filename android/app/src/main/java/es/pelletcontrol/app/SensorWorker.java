@@ -124,6 +124,7 @@ public class SensorWorker extends Worker {
                                 String.format(new Locale("es", "ES"), "El enchufe de la caldera marca %.0f W. Medido por el enchufe SwitchBot.", watts));
                     }
                     e.putBoolean("plugOn", on).putBoolean("heating", on);
+                    PelletWidget.savePlug(getApplicationContext(), watts, on);
                 }
             }
 

@@ -19,6 +19,11 @@ export interface WidgetPayload {
   tInAt?: number;
   tOut?: number;
   tOutAt?: number;
+  /** Enchufe de la caldera: hay uno elegido, y su última lectura (W, si supera el umbral y hora en ms). */
+  plug: boolean;
+  plugW?: number;
+  plugOn?: boolean;
+  plugAt?: number;
 }
 
 export type WidgetAction = 'purchase' | 'refill';
@@ -38,7 +43,12 @@ export function widgetPayload(data: AppData, now = Date.now()): WidgetPayload {
   const auto = autonomy(data);
   const tin = currentIndoor(data);
   const tout = currentOutdoor(data);
+  const c = data.settings.climate;
+  const plugList = c.plugId ? (data.climate.plug ?? []) : [];
+  const lastPlug = plugList.length ? plugList.reduce((a, b) => (a.at > b.at ? a : b)) : null;
   return {
+    plug: !!c.plugId,
+    ...(lastPlug ? { plugW: Math.round(lastPlug.watts), plugOn: lastPlug.watts >= c.plugThresholdW, plugAt: new Date(lastPlug.at).getTime() } : {}),
     ...(tin ? { tIn: Math.round(tin.temperature * 10) / 10, tInAt: new Date(tin.at).getTime() } : {}),
     ...(tout ? { tOut: Math.round(tout.temperature * 10) / 10, tOutAt: new Date(tout.at).getTime() } : {}),
     bags: String(stock),

@@ -53,6 +53,12 @@ public class WidgetPlugin extends Plugin {
             te.putFloat("tIn", tIn.floatValue()).putLong("tInAt", tInAt.longValue());
         if (tOut != null && tOutAt != null && tOutAt.longValue() >= tp.getLong("tOutAt", 0))
             te.putFloat("tOut", tOut.floatValue()).putLong("tOutAt", tOutAt.longValue());
+        // Enchufe de la caldera: igual, solo si la lectura es más nueva. Sin enchufe elegido se borra.
+        Double plugW = num(call, "plugW");
+        Double plugAt = num(call, "plugAt");
+        if (!Boolean.TRUE.equals(call.getBoolean("plug", false))) te.remove("plugW").remove("plugOn").remove("plugAt");
+        else if (plugW != null && plugAt != null && plugAt.longValue() >= tp.getLong("plugAt", 0))
+            te.putFloat("plugW", plugW.floatValue()).putBoolean("plugOn", Boolean.TRUE.equals(call.getBoolean("plugOn", false))).putLong("plugAt", plugAt.longValue());
         te.apply();
         getContext().getSharedPreferences(PelletWidget.PREFS, Context.MODE_PRIVATE).edit()
                 .putBoolean("has", true)
