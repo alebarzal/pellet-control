@@ -40,11 +40,11 @@ jobs:
           KEYSTORE_B64: ${{ secrets.DEBUG_KEYSTORE_B64 }}
         run: |
           test -n "$KEYSTORE_B64" || { echo "Falta el secreto DEBUG_KEYSTORE_B64"; exit 1; }
-          mkdir -p "$HOME/.android"
+          KS="$RUNNER_TEMP/pellet.keystore"
           # Se ignoran saltos de línea y otros caracteres que no sean base64 (según cómo se pegara el secreto).
-          printf '%s' "$KEYSTORE_B64" | base64 -di > "$HOME/.android/debug.keystore" || true
-          echo "Almacén de claves: $(wc -c < "$HOME/.android/debug.keystore") bytes"
-          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android | grep -q 1D:A9:7C:C3:43:4B:4A:FD || { echo "El secreto DEBUG_KEYSTORE_B64 no contiene la clave de firma esperada"; exit 1; }
+          printf '%s' "$KEYSTORE_B64" | base64 -di > "$KS" || true
+          keytool -list -keystore "$KS" -storepass android | grep -q 1D:A9:7C:C3:43:4B:4A:FD || { echo "El secreto DEBUG_KEYSTORE_B64 no contiene la clave de firma esperada"; exit 1; }
+          echo "PC_KEYSTORE=$KS" >> "$GITHUB_ENV"
 
       - name: Compilar
         run: |
@@ -53,6 +53,13 @@ jobs:
           cd android
           sh ./gradlew assembleDebug --no-daemon -q
           cp app/build/outputs/apk/debug/app-debug.apk ../PelletControl.apk
+
+      # Nunca publicar un APK con otra firma: el móvil no podría instalarlo encima.
+      - name: Comprobar la firma del APK
+        run: |
+          SIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$SIGNER" verify --print-certs PelletControl.apk | tee certs.txt
+          grep -q "SHA-256 digest: 1da97cc3434b4afdaf6424ebd086f1f07dfb3a7dd721a086530ef5249c85e730" certs.txt || { echo "El APK no está firmado con la clave de siempre"; exit 1; }
 
       - name: Publicar en la release «latest»
         env:

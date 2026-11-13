@@ -1,6 +1,9 @@
 package es.pelletcontrol.app;
 
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
@@ -18,6 +21,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Arrays;
 
 /**
  * Descarga el APK publicado en GitHub y abre el instalador de Android.
@@ -64,6 +68,11 @@ public class UpdaterPlugin extends Plugin {
         new Thread(() -> {
             try {
                 File apk = download(url, sha);
+                if (!sameSigner(apk)) {
+                    apk.delete();
+                    call.reject("La versión de GitHub está firmada con otra clave y Android no la instalaría encima. Hay que volver a publicarla.");
+                    return;
+                }
                 Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", apk);
                 Intent i = new Intent(Intent.ACTION_VIEW);
                 i.setDataAndType(uri, "application/vnd.android.package-archive");
@@ -76,6 +85,33 @@ public class UpdaterPlugin extends Plugin {
                 busy = false;
             }
         }).start();
+    }
+
+    @SuppressWarnings("deprecation")
+    private static Signature[] signers(PackageInfo info) {
+        if (info == null) return null;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) return info.signingInfo != null ? info.signingInfo.getApkContentsSigners() : null;
+        return info.signatures;
+    }
+
+    /** ¿El APK descargado está firmado igual que la app instalada? Si no se puede saber, se deja seguir. */
+    @SuppressWarnings("deprecation")
+    private boolean sameSigner(File apk) {
+        try {
+            PackageManager pm = getContext().getPackageManager();
+            int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
+            Signature[] mine = signers(pm.getPackageInfo(getContext().getPackageName(), flags));
+            PackageInfo other = pm.getPackageArchiveInfo(apk.getAbsolutePath(), flags);
+            if (other != null && other.applicationInfo != null) {
+                other.applicationInfo.sourceDir = apk.getAbsolutePath();
+                other.applicationInfo.publicSourceDir = apk.getAbsolutePath();
+            }
+            Signature[] theirs = signers(other);
+            if (mine == null || theirs == null) return true;
+            return Arrays.asList(mine).containsAll(Arrays.asList(theirs)) && Arrays.asList(theirs).containsAll(Arrays.asList(mine));
+        } catch (Exception e) {
+            return true;
+        }
     }
 
     /** Descarga a la caché (un archivo por versión; si ya está bajado no se repite). */
