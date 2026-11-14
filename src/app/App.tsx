@@ -24,6 +24,7 @@ import { ToastProvider } from '../ui/Toast';
 import { ROUTES, useRoute, type Route } from './router';
 import { BackButtonHandler } from '../features/back/BackButton';
 import { WhatsNew } from '../features/settings/WhatsNew';
+import { UpdatePrompt } from '../features/settings/UpdatePrompt';
 import { checkUpdateQuietly } from '../data/update';
 import { useEffect } from 'react';
 
@@ -179,7 +180,7 @@ function MobileNav({ route, go }: { route: Route; go: (r: Route) => void }) {
 
 function Shell() {
   const [route, go] = useRoute();
-  // Al abrir (y al volver a la app) se mira si hay versión nueva; la función ya limita la frecuencia.
+  // Al abrir (y al volver a la app) se mira si hay versión nueva; si la hay, sale un aviso.
   useEffect(() => {
     void checkUpdateQuietly();
     const on = () => document.visibilityState === 'visible' && void checkUpdateQuietly();
@@ -215,6 +216,7 @@ function Shell() {
       <MobileNav route={route} go={go} />
       <BackButtonHandler route={route} go={go} />
       <WhatsNew />
+      <UpdatePrompt go={go} />
     </div>
   );
 }

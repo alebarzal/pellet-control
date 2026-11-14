@@ -102,8 +102,26 @@ export async function installUpdate(build: PublishedBuild, onProgress: (percent:
 
 const CHECKED_KEY = 'pellet-control:update-checked';
 const AUTO_KEY = 'pellet-control:auto-update';
-/** Como mucho una consulta a GitHub cada 3 horas (GitHub limita las consultas sin cuenta). */
-const CHECK_EVERY_MS = 3 * 3600_000;
+const FOUND_KEY = 'pellet-control:update-found';
+/** Se mira cada vez que se entra, pero como mucho una consulta cada 10 minutos (GitHub limita las consultas sin cuenta). */
+const CHECK_EVERY_MS = 10 * 60_000;
+
+/**
+ * Versión nueva que se encontró en la última consulta, para volver a avisar al entrar sin preguntar
+ * otra vez a GitHub. Null si no había, si el dato está roto o si ya es la que está instalada.
+ */
+export function rememberedBuild(raw: string | null, installed: string): PublishedBuild | null {
+  if (!raw) return null;
+  try {
+    const b = JSON.parse(raw) as Partial<PublishedBuild> | null;
+    if (!b || typeof b.sha !== 'string' || !/^[0-9a-f]{40}$/.test(b.sha)) return null;
+    if (typeof b.url !== 'string' || !b.url.startsWith(DOWNLOAD_PREFIX)) return null;
+    if (sameCommit(b.sha, installed)) return null;
+    return { sha: b.sha, url: b.url, title: typeof b.title === 'string' ? b.title : '', at: typeof b.at === 'string' ? b.at : '', sizeMb: typeof b.sizeMb === 'number' ? b.sizeMb : 0 };
+  } catch {
+    return null;
+  }
+}
 
 let available: PublishedBuild | null = null;
 const listeners = new Set<() => void>();
@@ -121,15 +139,46 @@ export function useAvailableUpdate(): PublishedBuild | null {
 
 export function setAvailableUpdate(b: PublishedBuild | null) {
   available = b;
+  try {
+    if (b) localStorage.setItem(FOUND_KEY, JSON.stringify(b));
+    else localStorage.removeItem(FOUND_KEY);
+  } catch {
+    /* sin almacenamiento: se volverá a mirar */
+  }
   listeners.forEach((l) => l());
 }
 
-/** Mira en segundo plano si hay versión nueva. Silenciosa: sin red o sin respuesta no avisa de nada. */
+/* Aviso emergente al entrar: «Más tarde» lo quita hasta la próxima vez que se abra la app. */
+let promptDismissed: string | null = null;
+
+export function useUpdatePromptDismissed(): string | null {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+    () => promptDismissed,
+  );
+}
+
+export function dismissUpdatePrompt(sha: string) {
+  promptDismissed = sha;
+  listeners.forEach((l) => l());
+}
+
+/** Mira si hay versión nueva al entrar en la app. Silenciosa: sin red o sin respuesta no avisa de nada. */
 export async function checkUpdateQuietly(now = Date.now()): Promise<void> {
   if (!updaterAvailable() || !BUILD_SHA) return;
   try {
     const last = Number(localStorage.getItem(CHECKED_KEY) ?? 0);
-    if (now - last < CHECK_EVERY_MS) return;
+    if (now - last < CHECK_EVERY_MS) {
+      // Recién consultado: se avisa con lo que se encontró entonces.
+      if (!available) {
+        const b = rememberedBuild(localStorage.getItem(FOUND_KEY), BUILD_SHA);
+        if (b) setAvailableUpdate(b);
+      }
+      return;
+    }
     localStorage.setItem(CHECKED_KEY, String(now));
   } catch {
     /* sin almacenamiento: se mira igual */
@@ -142,7 +191,7 @@ export async function checkUpdateQuietly(now = Date.now()): Promise<void> {
   }
 }
 
-/** El aviso de Inicio pide a Configuración que empiece a actualizar nada más abrirse. */
+/** Los avisos de versión nueva piden a Configuración que empiece a actualizar nada más abrirse. */
 export function requestAutoInstall() {
   try {
     sessionStorage.setItem(AUTO_KEY, '1');

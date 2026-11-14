@@ -15,6 +15,20 @@ const setOpen = (v: boolean) => {
 };
 export const openWhatsNew = () => setOpen(true);
 
+/* Novedades sin ver al arrancar: hasta que se cierren, los demás avisos esperan. */
+let pending = unseenReleases(readSeenVersion()).length > 0;
+
+/** Las novedades están abiertas o a punto de abrirse. */
+export function useWhatsNewBusy(): boolean {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+    () => openState || pending,
+  );
+}
+
 function ReleaseBlock({ r, open }: { r: Release; open: boolean }) {
   return (
     <section>
@@ -65,6 +79,7 @@ export function WhatsNew() {
 
   const close = () => {
     markSeen();
+    pending = false;
     setOpen(false);
     setShowOld(false);
   };

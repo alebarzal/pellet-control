@@ -93,7 +93,7 @@ export function UpdateCard() {
             {phase.text}
           </p>
         )}
-        <p className="text-[0.8125rem] text-ink-3">Descarga la versión del último cambio subido a GitHub y abre el instalador de Android. Al abrir la app se mira sola cada pocas horas.</p>
+        <p className="text-[0.8125rem] text-ink-3">Descarga la versión del último cambio subido a GitHub y abre el instalador de Android. Cada vez que entras en la app se mira sola y, si hay versión nueva, te avisa.</p>
       </div>}
     </div>
   );

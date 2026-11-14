@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decide, parseRelease } from './update';
+import { decide, parseRelease, rememberedBuild } from './update';
 
 const A = 'a'.repeat(40);
 const B = 'b'.repeat(40);
@@ -42,5 +42,16 @@ describe('actualización desde GitHub', () => {
     expect(decide(B, a, B)).toEqual({ state: 'building', build: null });
     // Sin poder leer el último push, manda la release.
     expect(decide(A, a, null).state).toBe('current');
+  });
+
+  it('recuerda la versión encontrada para avisar al volver a entrar', () => {
+    const b = parseRelease(release(B))!;
+    expect(rememberedBuild(JSON.stringify(b), A)).toEqual(b);
+    // Ya instalada, dato roto o descarga en otro sitio: no se avisa.
+    expect(rememberedBuild(JSON.stringify(b), B)).toBeNull();
+    expect(rememberedBuild(null, A)).toBeNull();
+    expect(rememberedBuild('{mal', A)).toBeNull();
+    expect(rememberedBuild(JSON.stringify({ ...b, url: 'https://example.com/x.apk' }), A)).toBeNull();
+    expect(rememberedBuild(JSON.stringify({ ...b, sha: 'abc' }), A)).toBeNull();
   });
 });

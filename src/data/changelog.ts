@@ -14,6 +14,16 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.8',
+    date: '2026-11-14',
+    summary: 'Aviso al entrar cuando hay una versión nueva',
+    items: [
+      'Si hay una versión nueva, al entrar en la app sale un aviso con lo que trae y un botón «Actualizar ahora» que la descarga y abre el instalador.',
+      'Se comprueba cada vez que entras (antes, cada 3 horas) y el aviso ya no se pierde al cerrar y volver a abrir la app.',
+      'Con «Más tarde» no vuelve a salir hasta la próxima vez que abras la app; el aviso pequeño de Inicio sigue ahí.',
+    ],
+  },
+  {
     version: '1.7',
     date: '2026-11-14',
     summary: 'Pellet de tienda física con foto y comparación en la web',
