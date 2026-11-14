@@ -31,6 +31,11 @@
 
         </activity>
 
+        <!-- Pide a los servicios de Google el modelo para leer texto en fotos. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr" />
+
         <receiver
             android:name=".PelletWidget"
             android:exported="false"

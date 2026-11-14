@@ -346,3 +346,101 @@ export const emptyQuality = (): QualitySpec => ({
   durabilityPct: null,
   diameterMm: null,
 });
+
+/* ───────────── Importar desde una foto (saco o etiqueta de precio) ───────────── */
+
+/** Marcas habituales en España, para reconocerlas en el texto de la foto. */
+const KNOWN_BRANDS = ['Huella Verde', 'Naturpellet', 'Enerbio', 'Burpellet', 'Ecoforest', 'Pellets Asturias', 'Biomasa Forestal', 'Amatex', 'Ribpellet', 'Gesbrick', 'Pinewells'];
+
+export interface LabelData {
+  name: string | null;
+  brand: string | null;
+  weightKg: number | null;
+  /** Precio del saco (no el precio por kg que también traen las etiquetas del lineal). */
+  price: number | null;
+  quality: Partial<QualitySpec>;
+}
+
+/** Precio del formato en un texto de etiqueta: ignora los «€/kg» y se queda con el importe mayor. */
+export function extractLabelPrice(text: string): number | null {
+  const found: number[] = [];
+  const re = /(?:€\s?(\d{1,4}[.,]\d{2})|(\d{1,4}[.,]\d{2})\s?(?:€|eur\b))(\s?\/\s?(?:kg|kilo|k\b))?/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (m[3]) continue;
+    const n = num(m[1] ?? m[2]);
+    if (n != null && n >= 1 && n <= 2000) found.push(n);
+  }
+  return found.length ? Math.max(...found) : null;
+}
+
+/** Saca del texto leído en la foto lo que sirva para rellenar la ficha. No inventa nada: lo que no está, queda vacío. */
+export function parseLabelText(raw: string, brands: string[] = []): LabelData {
+  const text = raw.replace(/\s+/g, ' ').trim();
+  const lower = text.toLowerCase();
+  const brand = [...brands, ...KNOWN_BRANDS].find((b) => b.trim() && lower.includes(b.trim().toLowerCase())) ?? null;
+  const weightKg = extractWeightKg(text);
+  const line = raw
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find((l) => /pel+ets?/i.test(l) && l.length >= 6 && l.length <= 60);
+  const name = brand ? `Pellet ${brand}${weightKg ? ` ${weightKg} kg` : ''}` : (line ?? null);
+  return { name, brand, weightKg, price: extractLabelPrice(text), quality: extractQuality(text) };
+}
+
+/* ───────────── Buscar el mismo pellet en otras tiendas ───────────── */
+
+/** Qué buscar para comparar un producto: marca (o nombre) y formato. */
+export function offerQuery(p: Pick<MarketProduct, 'name' | 'brand' | 'bagWeightKg'>): string {
+  const what = p.brand.trim() || p.name.replace(/pel+ets?/gi, '').replace(/\d+(?:[.,]\d+)?\s?kg/gi, '').trim();
+  return `pellet ${what} ${p.bagWeightKg} kg precio`.replace(/\s+/g, ' ').trim();
+}
+
+/** Enlaces de los resultados de la página de búsqueda (versión HTML sin scripts de DuckDuckGo), sin anuncios. */
+export function searchResultUrls(html: string): string[] {
+  const out: string[] = [];
+  const re = /class="result__a"[^>]*href="([^"]+)"/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) {
+    const href = decodeEntities(m[1]);
+    let target = href;
+    const u = /[?&]uddg=([^&]+)/.exec(href);
+    if (u) {
+      try {
+        target = decodeURIComponent(u[1]);
+      } catch {
+        continue;
+      }
+    }
+    if (!/^https?:\/\//.test(target)) continue;
+    // Anuncios y redirecciones del propio buscador
+    if (/duckduckgo\.com\/y\.js|bing\.com\/aclick/.test(target)) continue;
+    if (/(youtube|facebook|instagram|wikipedia|pinterest|tiktok)\./.test(target)) continue;
+    if (!out.includes(target)) out.push(target);
+  }
+  return out;
+}
+
+export interface WebOffer {
+  url: string;
+  store: string;
+  name: string;
+  brand: string;
+  price: number;
+  weightKg: number;
+  perKg: number;
+  available: boolean | null;
+  quality: Partial<QualitySpec>;
+}
+
+/** Convierte una ficha de tienda en una oferta comparable. Null si no es pellet o no publica precio y peso. */
+export function offerFromPage(url: string, html: string): WebOffer | null {
+  const p = parseProductPage(html);
+  if (p.price == null || !p.weightKg || !p.name) return null;
+  if (!/pel+ets?/i.test(`${p.name} ${url}`)) return null;
+  if (p.currency && !/eur/i.test(p.currency)) return null;
+  const perKg = p.price / p.weightKg;
+  // Fuera de rango: accesorios, estufas o pesos mal leídos.
+  if (perKg < 0.1 || perKg > 2) return null;
+  return { url, store: storeFromUrl(url), name: p.name, brand: p.brand ?? '', price: p.price, weightKg: p.weightKg, perKg, available: p.available, quality: p.quality };
+}

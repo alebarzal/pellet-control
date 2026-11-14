@@ -14,6 +14,17 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.7',
+    date: '2026-11-14',
+    summary: 'Pellet de tienda física con foto y comparación en la web',
+    items: [
+      'Importar desde una foto: en Precios → Añadir producto, haz una foto al saco o a la etiqueta del lineal. La app lee la marca, el peso, el precio y los datos de calidad, y tú revisas antes de guardar. Sirve para pellet que no sale en ninguna web, como el que compras en el supermercado.',
+      'La foto se guarda como miniatura con el producto y se ve en la comparativa.',
+      'Comparar en la web: desde la ficha de un producto, la app busca el mismo pellet en tiendas online, lee el precio de cada una y te dice cuánto más caro o barato sale por kilo frente al tuyo. Puedes seguir las que te interesen con un toque.',
+      '«Buscar ofertas en la web» en la comparativa hace lo mismo sin partir de un producto.',
+    ],
+  },
+  {
     version: '1.6',
     date: '2026-11-14',
     summary: 'Novedades al actualizar, aviso de pellet bajo y atajos',

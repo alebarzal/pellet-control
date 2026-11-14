@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assessQuality, emptyQuality, lastChange, marketRows, parseProductPage, sortRows, storeFromUrl } from './market';
+import { assessQuality, emptyQuality, extractLabelPrice, lastChange, marketRows, offerFromPage, offerQuery, parseLabelText, parseProductPage, searchResultUrls, sortRows, storeFromUrl } from './market';
 import type { MarketProduct } from './types';
 
 // Fichas mínimas con la misma estructura que las tiendas reales (schema.org).
@@ -82,5 +82,58 @@ describe('calidad y comparación', () => {
   it('nombre de tienda', () => {
     expect(storeFromUrl('https://www.elcorteingles.es/bricor/x')).toBe('El Corte Inglés');
     expect(storeFromUrl('https://tienda-pellets.com/p')).toBe('Tienda-pellets');
+  });
+});
+
+describe('importar desde una foto', () => {
+  it('lee la etiqueta de precio del lineal', () => {
+    const t = 'PELLET HUELLA VERDE\nSACO 15 KG\n4,95 €\n0,33 €/kg\nENplus A1';
+    const d = parseLabelText(t);
+    expect(d.brand).toBe('Huella Verde');
+    expect(d.weightKg).toBe(15);
+    expect(d.price).toBe(4.95);
+    expect(d.name).toBe('Pellet Huella Verde 15 kg');
+    expect(d.quality.certification).toBe('enplus-a1');
+  });
+
+  it('lee los datos de calidad del saco y no inventa precio', () => {
+    const d = parseLabelText('Pellets de madera 100% natural\nCenizas < 0,5 %\nHumedad < 8 %\nPoder calorífico 4,9 kWh/kg\nDiámetro 6 mm\n15 kg');
+    expect(d.price).toBeNull();
+    expect(d.brand).toBeNull();
+    expect(d.name).toBe('Pellets de madera 100% natural');
+    expect(d.quality.ashPct).toBe(0.5);
+    expect(d.quality.moisturePct).toBe(8);
+    expect(d.quality.ncvKwhKg).toBe(4.9);
+  });
+
+  it('no confunde el precio por kilo con el del saco', () => {
+    expect(extractLabelPrice('0,33 €/kg 4,95€')).toBe(4.95);
+    expect(extractLabelPrice('0,33 €/kg')).toBeNull();
+    expect(extractLabelPrice('€ 5,10')).toBe(5.1);
+  });
+});
+
+describe('buscar en otras tiendas', () => {
+  it('prepara la búsqueda con marca y formato', () => {
+    expect(offerQuery({ name: 'Pellet 15 kg', brand: 'Huella Verde', bagWeightKg: 15 })).toBe('pellet Huella Verde 15 kg precio');
+    expect(offerQuery({ name: 'Pellets Leclerc 15 kg', brand: '', bagWeightKg: 15 })).toBe('pellet Leclerc 15 kg precio');
+  });
+
+  it('saca los enlaces de los resultados y descarta anuncios', () => {
+    const html = `
+      <a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fduckduckgo.com%2Fy.js%3Fad_domain%3Damazon.es&amp;rut=1">Anuncio</a>
+      <a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.obramat.es%2Fproductos%2Fpellet%2Dhuella%2Dverde%2D15kg.html&amp;rut=2">Obramat</a>
+      <a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.youtube.com%2Fwatch&amp;rut=3">Vídeo</a>`;
+    expect(searchResultUrls(html)).toEqual(['https://www.obramat.es/productos/pellet-huella-verde-15kg.html']);
+  });
+
+  it('convierte una ficha en oferta y descarta lo que no es pellet', () => {
+    const page = (name: string, price: number) =>
+      `<script type="application/ld+json">${JSON.stringify({ '@type': 'Product', name, offers: { price, priceCurrency: 'EUR', availability: 'https://schema.org/InStock' } })}</script>`;
+    const o = offerFromPage('https://www.obramat.es/p/pellet-15kg.html', page('Pellet Huella Verde 15 kg', 5.25))!;
+    expect(o.store).toBe('Obramat');
+    expect(o.perKg).toBeCloseTo(0.35, 5);
+    expect(offerFromPage('https://x.es/estufa', page('Estufa de 12 kg', 899))).toBeNull();
+    expect(offerFromPage('https://x.es/pellet', page('Pellet sin peso', 5))).toBeNull();
   });
 });

@@ -19,6 +19,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(WidgetPlugin.class);
         registerPlugin(CalendarPlugin.class);
         registerPlugin(UpdaterPlugin.class);
+        registerPlugin(OcrPlugin.class);
         super.onCreate(savedInstanceState);
 
         // Android 15+ dibuja la app a pantalla completa (edge-to-edge) y ya no encoge la ventana

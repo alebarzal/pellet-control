@@ -1,7 +1,8 @@
 import { Globe, Loader2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { FetchError, fetchPage } from '../../data/web';
-import { CERT_LABEL, emptyQuality, parseProductPage, storeFromUrl, type ParsedProduct } from '../../domain/market';
+import { CERT_LABEL, emptyQuality, parseLabelText, parseProductPage, storeFromUrl, type ParsedProduct } from '../../domain/market';
+import { PhotoImport } from './PhotoImport';
 import { fmtEur } from '../../domain/format';
 import type { Certification, MarketProduct, PriceObservation, QualitySpec } from '../../domain/types';
 import { useStore } from '../../store/store';
@@ -35,6 +36,8 @@ export function ProductForm({
   const [dia, setDia] = useState(decimalToInput(q0.diameterMm));
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [photo, setPhoto] = useState<string | null>(initial?.photo ?? null);
+  const [photoResult, setPhotoResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [reading, setReading] = useState(false);
   const [readResult, setReadResult] = useState<{ ok: boolean; text: string; parsed?: ParsedProduct } | null>(null);
 
@@ -77,6 +80,36 @@ export function ProductForm({
     }
   }
 
+  /** Rellena la ficha con lo que se haya leído en la foto (solo lo que aparezca; no pisa con vacíos). */
+  function fromPhoto(text: string) {
+    const d = parseLabelText(text, data.settings.brands);
+    if (d.name && !name.trim()) setName(d.name);
+    if (d.brand) setBrand(d.brand);
+    if (d.weightKg) setWeight(decimalToInput(d.weightKg));
+    if (d.price != null && !initial) setPrice(decimalToInput(d.price));
+    const q = d.quality;
+    if (q.certification) setCert(q.certification);
+    if (q.ashPct != null) setAsh(decimalToInput(q.ashPct));
+    if (q.moisturePct != null) setMoist(decimalToInput(q.moisturePct));
+    if (q.ncvKwhKg != null) setNcv(decimalToInput(q.ncvKwhKg));
+    if (q.durabilityPct != null) setDur(decimalToInput(q.durabilityPct));
+    if (q.diameterMm != null) setDia(decimalToInput(q.diameterMm));
+    const found = [
+      d.brand,
+      d.weightKg && `${d.weightKg} kg`,
+      d.price != null && `precio ${fmtEur(d.price)}`,
+      q.certification && CERT_LABEL[q.certification],
+      q.ashPct != null && `cenizas ${decimalToInput(q.ashPct)} %`,
+      q.moisturePct != null && `humedad ${decimalToInput(q.moisturePct)} %`,
+      q.ncvKwhKg != null && `${decimalToInput(q.ncvKwhKg)} kWh/kg`,
+    ].filter(Boolean);
+    setPhotoResult(
+      found.length
+        ? { ok: true, text: `Leído en la foto: ${found.join(' · ')}. Revisa los datos y completa lo que falte.` }
+        : { ok: false, text: 'No se ha reconocido ningún dato en la foto. Rellena la ficha a mano o prueba con una foto más cercana de la etiqueta.' },
+    );
+  }
+
   function opt(v: string, key: string, min: number, max: number, e: Record<string, string>, msg: string) {
     if (v.trim() === '') return null;
     const n = parseDecimal(v);
@@ -115,6 +148,7 @@ export function ProductForm({
       bagWeightKg: w,
       quality,
       notes: notes.trim(),
+      photo,
     };
     if (initial) {
       patchProduct(initial.id, (p) => ({ ...p, ...base }));
@@ -140,6 +174,10 @@ export function ProductForm({
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+      <PhotoImport photo={photo} onPhoto={setPhoto} onText={fromPhoto} />
+      {photoResult && (
+        <p className={`rounded-xl px-3 py-2.5 text-[0.8125rem] ${photoResult.ok ? 'bg-olive-soft text-olive-strong' : 'bg-amber-soft text-amber'}`}>{photoResult.text}</p>
+      )}
       <div className="flex flex-col gap-2">
         <TextInput
           label="Enlace del producto en la tienda"
@@ -152,7 +190,7 @@ export function ProductForm({
             if (!store) setStore(storeFromUrl(e.target.value));
           }}
           error={errors.url}
-          hint="Pega la ficha del saco o pack. Puedes dejarlo vacío y anotar el precio a mano."
+          hint="Pega la ficha del saco o pack. Si lo compras en una tienda que no lo tiene en su web, déjalo vacío y anota el precio a mano."
         />
         <Button
           size="sm"

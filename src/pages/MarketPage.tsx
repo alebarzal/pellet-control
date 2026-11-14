@@ -2,6 +2,7 @@ import {
   Award,
   CircleAlert,
   ExternalLink,
+  Globe,
   Loader2,
   Pencil,
   Plus,
@@ -18,6 +19,7 @@ import type { PageProps } from '../app/App';
 import { FetchError, fetchPage, isNative, openExternal } from '../data/web';
 import { axisProps, C, ChartTooltip, gridProps } from '../features/charts/chartKit';
 import { ProductForm } from '../features/market/ProductForm';
+import { WebCompare } from '../features/market/WebCompare';
 import { effectivePricePerKg, seasonProjection } from '../domain/calc';
 import {
   A1_LIMITS,
@@ -107,7 +109,9 @@ function ProductRow({ row, yourPerKg, busy, onOpen }: { row: MarketRow; yourPerK
   return (
     <li>
       <button onClick={onOpen} className="group grid w-full grid-cols-[1fr_auto] gap-x-4 gap-y-2 rounded-2xl px-3 py-3 text-left transition-[transform,background-color] duration-150 hover:bg-sand-soft/70 active:scale-[0.985] active:bg-sand-soft sm:grid-cols-[1fr_8rem_7rem_6.5rem]">
-        <span className="min-w-0">
+        <span className="flex min-w-0 items-start gap-3">
+          {p.photo && <img src={p.photo} alt="" className="size-11 shrink-0 rounded-lg object-cover ring-1 ring-line" />}
+          <span className="min-w-0">
           <span className="line-clamp-2 font-semibold">{p.name}</span>
           <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-2">
             {[p.brand, p.store].filter(Boolean).join(' · ') || 'Sin tienda'}
@@ -122,6 +126,7 @@ function ProductRow({ row, yourPerKg, busy, onOpen }: { row: MarketRow; yourPerK
               {p.lastCheck.message}
             </span>
           )}
+          </span>
         </span>
         <span className="flex flex-col items-end sm:order-none">
           <span className="num font-bold">{row.perKg != null ? `${fmtEurKg(row.perKg)}/kg` : '—'}</span>
@@ -172,7 +177,9 @@ function ProductDetail({
   onRefresh,
   onEdit,
   onDelete,
+  onCompare,
 }: {
+  onCompare: () => void;
   product: MarketProduct;
   yourPerKg: number | null;
   busy: boolean;
@@ -202,6 +209,7 @@ function ProductDetail({
 
   return (
     <div className="flex flex-col gap-5">
+      {product.photo && <img src={product.photo} alt={`Foto de ${product.name}`} className="max-h-48 self-start rounded-2xl object-contain ring-1 ring-line" />}
       <div className="grid grid-cols-2 gap-4">
         <Stat label="Precio actual" value={last ? fmtEur(last.price) : '—'} hint={last ? `${fmtNum(product.bagWeightKg)} kg · ${last.source === 'online' ? 'leído online' : 'anotado a mano'}` : undefined} />
         <Stat
@@ -273,6 +281,9 @@ function ProductDetail({
             </Button>
           </>
         )}
+        <Button variant={product.url ? 'secondary' : 'primary'} icon={<Globe className="size-4" />} onClick={onCompare}>
+          Comparar en la web
+        </Button>
         <Button variant="ghost" icon={<Pencil className="size-4" />} onClick={onEdit}>
           Editar
         </Button>
@@ -289,7 +300,7 @@ export function MarketPage(_: PageProps) {
   const toast = useToast();
   const { busy, refresh } = useRefresher();
   const [sort, setSort] = useState<MarketSort>('valor');
-  const [dialog, setDialog] = useState<{ type: 'add'; url?: string } | { type: 'edit'; id: string } | { type: 'detail'; id: string } | null>(null);
+  const [dialog, setDialog] = useState<{ type: 'add'; url?: string } | { type: 'edit'; id: string } | { type: 'detail'; id: string } | { type: 'compare'; id?: string } | null>(null);
   const [toDelete, setToDelete] = useState<MarketProduct | null>(null);
   const [refreshingAll, setRefreshingAll] = useState(false);
   const autoDone = useRef(false);
@@ -328,7 +339,7 @@ export function MarketPage(_: PageProps) {
     if (stale.length) void refreshAll(stale);
   }, [data.market, refreshAll]);
 
-  const current = dialog && dialog.type !== 'add' ? data.market.find((p) => p.id === dialog.id) : undefined;
+  const current = dialog && dialog.type !== 'add' && dialog.id ? data.market.find((p) => p.id === dialog.id) : undefined;
   const searchUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent('saco pellet 15 kg ENplus A1')}`;
 
   return (
@@ -454,8 +465,8 @@ export function MarketPage(_: PageProps) {
         )}
         {rows.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
-            <button onClick={() => openExternal(searchUrl)} className="flex items-center gap-1.5 text-sm font-semibold text-olive-strong hover:underline">
-              <Search className="size-4" /> Buscar más ofertas
+            <button onClick={() => setDialog({ type: 'compare' })} className="flex items-center gap-1.5 text-sm font-semibold text-olive-strong hover:underline">
+              <Search className="size-4" /> Buscar ofertas en la web
             </button>
             {SUGGESTIONS.filter((s) => !data.market.some((p) => p.url === s.url)).map((s) => (
               <button key={s.url} onClick={() => setDialog({ type: 'add', url: s.url })} className="text-sm font-semibold text-olive-strong hover:underline">
@@ -496,8 +507,14 @@ export function MarketPage(_: PageProps) {
       <Dialog
         open={!!dialog}
         onClose={() => setDialog(null)}
-        title={dialog?.type === 'add' ? 'Seguir un producto' : dialog?.type === 'edit' ? 'Editar producto' : (current?.name ?? '')}
-        description={dialog?.type === 'detail' && current ? [current.brand, current.store].filter(Boolean).join(' · ') : undefined}
+        title={dialog?.type === 'add' ? 'Seguir un producto' : dialog?.type === 'edit' ? 'Editar producto' : dialog?.type === 'compare' ? 'Comparar en la web' : (current?.name ?? '')}
+        description={
+          dialog?.type === 'detail' && current
+            ? [current.brand, current.store].filter(Boolean).join(' · ')
+            : dialog?.type === 'compare'
+              ? 'Busca el mismo pellet en tiendas online y compara el precio por kilo.'
+              : undefined
+        }
       >
         {dialog?.type === 'add' && (
           <ProductForm
@@ -524,10 +541,12 @@ export function MarketPage(_: PageProps) {
             yourPerKg={yourPerKg}
             busy={busy.has(current.id)}
             onRefresh={() => refresh(current)}
+            onCompare={() => setDialog({ type: 'compare', id: current.id })}
             onEdit={() => setDialog({ type: 'edit', id: current.id })}
             onDelete={() => setToDelete(current)}
           />
         )}
+        {dialog?.type === 'compare' && <WebCompare key={dialog.id ?? 'general'} reference={current} yourPerKg={yourPerKg} />}
       </Dialog>
 
       <ConfirmDialog

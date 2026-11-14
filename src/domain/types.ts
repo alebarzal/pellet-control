@@ -170,6 +170,8 @@ export interface MarketProduct {
   prices: PriceObservation[];
   lastCheck: { at: string; ok: boolean; message: string } | null;
   notes: string;
+  /** Miniatura (data URL JPEG) de la foto del saco o de la etiqueta de precio. */
+  photo?: string | null;
   createdAt: number;
 }
 
