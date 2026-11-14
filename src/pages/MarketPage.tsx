@@ -13,6 +13,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
+import { Camera as CameraIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { PageProps } from '../app/App';
@@ -300,7 +301,7 @@ export function MarketPage(_: PageProps) {
   const toast = useToast();
   const { busy, refresh } = useRefresher();
   const [sort, setSort] = useState<MarketSort>('valor');
-  const [dialog, setDialog] = useState<{ type: 'add'; url?: string } | { type: 'edit'; id: string } | { type: 'detail'; id: string } | { type: 'compare'; id?: string } | null>(null);
+  const [dialog, setDialog] = useState<{ type: 'add'; url?: string; store?: boolean } | { type: 'edit'; id: string } | { type: 'detail'; id: string } | { type: 'compare'; id?: string } | null>(null);
   const [toDelete, setToDelete] = useState<MarketProduct | null>(null);
   const [refreshingAll, setRefreshingAll] = useState(false);
   const autoDone = useRef(false);
@@ -349,6 +350,9 @@ export function MarketPage(_: PageProps) {
         description="Sigue fichas de pellet en tiendas online, compara €/kg y calidad, y mira cuánto ahorrarías."
         actions={
           <>
+            <Button icon={<CameraIcon className="size-4" />} onClick={() => setDialog({ type: 'add', store: true })}>
+              Saco en tienda
+            </Button>
             <Button icon={<Plus className="size-4" />} onClick={() => setDialog({ type: 'add' })}>
               Añadir producto
             </Button>
@@ -447,6 +451,9 @@ export function MarketPage(_: PageProps) {
                   <Button size="sm" variant="primary" icon={<Plus className="size-4" />} onClick={() => setDialog({ type: 'add' })}>
                     Añadir producto
                   </Button>
+                  <Button size="sm" icon={<CameraIcon className="size-4" />} onClick={() => setDialog({ type: 'add', store: true })}>
+                    Saco en tienda
+                  </Button>
                   <Button size="sm" icon={<Search className="size-4" />} onClick={() => openExternal(searchUrl)}>
                     Buscar ofertas
                   </Button>
@@ -507,19 +514,22 @@ export function MarketPage(_: PageProps) {
       <Dialog
         open={!!dialog}
         onClose={() => setDialog(null)}
-        title={dialog?.type === 'add' ? 'Seguir un producto' : dialog?.type === 'edit' ? 'Editar producto' : dialog?.type === 'compare' ? 'Comparar en la web' : (current?.name ?? '')}
+        title={dialog?.type === 'add' ? (dialog.store ? 'Saco visto en tienda' : 'Seguir un producto') : dialog?.type === 'edit' ? 'Editar producto' : dialog?.type === 'compare' ? 'Comparar en la web' : (current?.name ?? '')}
         description={
           dialog?.type === 'detail' && current
             ? [current.brand, current.store].filter(Boolean).join(' · ')
             : dialog?.type === 'compare'
               ? 'Busca el mismo pellet en tiendas online y compara el precio por kilo.'
-              : undefined
+              : dialog?.type === 'add' && dialog.store
+                ? 'Haz una foto al saco o a la etiqueta del precio. La app rellena lo que lea y te señala lo que falta.'
+                : undefined
         }
       >
         {dialog?.type === 'add' && (
           <ProductForm
-            key={dialog.url ?? 'new'}
+            key={dialog.store ? 'store' : (dialog.url ?? 'new')}
             initialUrl={dialog.url}
+            mode={dialog.store ? 'store' : undefined}
             onDone={(p) => {
               setDialog(p ? { type: 'detail', id: p.id } : null);
               if (p) toast.show({ title: 'Producto añadido', body: p.name });

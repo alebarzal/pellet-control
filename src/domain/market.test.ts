@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assessQuality, emptyQuality, extractLabelPrice, lastChange, marketRows, offerFromPage, offerQuery, parseLabelText, parseProductPage, searchResultUrls, sortRows, storeFromUrl } from './market';
+import { assessQuality, emptyQuality, extractLabelPrice, labelReport, lastChange, marketRows, offerFromPage, offerQuery, parseLabelText, parseProductPage, searchResultUrls, sortRows, storeFromUrl } from './market';
 import type { MarketProduct } from './types';
 
 // Fichas mínimas con la misma estructura que las tiendas reales (schema.org).
@@ -135,5 +135,30 @@ describe('buscar en otras tiendas', () => {
     expect(o.perKg).toBeCloseTo(0.35, 5);
     expect(offerFromPage('https://x.es/estufa', page('Estufa de 12 kg', 899))).toBeNull();
     expect(offerFromPage('https://x.es/pellet', page('Pellet sin peso', 5))).toBeNull();
+  });
+});
+
+describe('saco visto en tienda', () => {
+  it('reconoce la tienda si sale en la etiqueta', () => {
+    expect(parseLabelText('E.LECLERC\nPELLET HUELLA VERDE 15KG\n4,95 €').store).toBe('Leclerc');
+    expect(parseLabelText('Pellets 15 kg 5,49 €').store).toBeNull();
+  });
+
+  it('dice dato a dato qué se ha leído y qué hay que poner a mano', () => {
+    const r = labelReport(parseLabelText('E.LECLERC\nPELLET HUELLA VERDE 15KG ENplus A1\n0,33 €/kg\n4,95 €'));
+    const by = Object.fromEntries(r.map((i) => [i.key, i]));
+    expect(by.brand.value).toBe('Huella Verde');
+    expect(by.store.value).toBe('Leclerc');
+    expect(by.weight.value).toBe('15 kg');
+    expect(by.price.value).toBe('4,95 €');
+    expect(by.cert.value).not.toBeNull();
+    expect(by.ash.value).toBeNull();
+    expect(by.ash.required).toBe(false);
+    // Sin precio en la foto: es obligatorio y queda señalado.
+    const sin = labelReport(parseLabelText('Pellets de madera\nCenizas < 0,5 %\n15 kg'));
+    const precio = sin.find((i) => i.key === 'price')!;
+    expect(precio.value).toBeNull();
+    expect(precio.required).toBe(true);
+    expect(sin.find((i) => i.key === 'ash')!.value).toBe('0,5 %');
   });
 });

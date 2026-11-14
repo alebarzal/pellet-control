@@ -1,7 +1,7 @@
 import { Camera as NativeCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
 import { Camera, ImageUp, Loader2, X } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ocrAvailable, recognizeText, toJpeg } from '../../data/ocr';
 import { Button } from '../../ui/primitives';
 
@@ -13,11 +13,14 @@ export function PhotoImport({
   photo,
   onPhoto,
   onText,
+  autoOpen,
 }: {
   photo: string | null;
   onPhoto: (thumb: string | null) => void;
   /** Texto leído en la foto (solo en la app Android). */
   onText: (text: string) => void;
+  /** Abrir la cámara nada más mostrarse (saco visto en tienda). */
+  autoOpen?: boolean;
 }) {
   const camRef = useRef<HTMLInputElement>(null);
   const galRef = useRef<HTMLInputElement>(null);
@@ -57,6 +60,14 @@ export function PhotoImport({
       if (!/cancel/i.test(msg)) setErr('No se pudo abrir la cámara. Revisa el permiso de cámara de Pellet Control en los ajustes del móvil.');
     }
   }
+
+  const opened = useRef(false);
+  useEffect(() => {
+    if (!autoOpen || opened.current) return;
+    opened.current = true;
+    void open('camera');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const pick = (f: File | undefined) => f && void use(URL.createObjectURL(f));
 

@@ -6,16 +6,22 @@ import { cx } from './primitives';
 const control =
   'w-full rounded-xl bg-surface px-3.5 text-base text-ink ring-1 ring-line ring-inset transition-shadow placeholder:text-ink-3 hover:ring-ink-3/40 focus:outline-none focus:ring-2 focus:ring-olive disabled:bg-sand-soft disabled:text-ink-3';
 
+/** Dato rellenado solo (por ejemplo, leído en una foto) o que la app pide poner a mano. */
+export type FieldMark = 'found' | 'missing';
+const markRing = (m?: FieldMark) => (m === 'found' ? 'ring-olive/60' : m === 'missing' ? 'bg-amber-soft/40 ring-amber/60' : false);
+
 export function Field({
   label,
   error,
   hint,
+  mark,
   children,
   className,
 }: {
   label: string;
   error?: string;
   hint?: ReactNode;
+  mark?: FieldMark;
   children: (id: string, describedBy?: string) => ReactNode;
   className?: string;
 }) {
@@ -32,7 +38,7 @@ export function Field({
           {error}
         </p>
       ) : hint ? (
-        <p id={msgId} className="text-[0.8125rem] text-ink-3">
+        <p id={msgId} className={cx('text-[0.8125rem]', mark === 'found' ? 'font-medium text-olive-strong' : mark === 'missing' ? 'font-medium text-amber' : 'text-ink-3')}>
           {hint}
         </p>
       ) : null}
@@ -45,11 +51,12 @@ export function TextInput({
   error,
   hint,
   suffix,
+  mark,
   className,
   ...rest
-}: InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string; hint?: ReactNode; suffix?: string }) {
+}: InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string; hint?: ReactNode; suffix?: string; mark?: FieldMark }) {
   return (
-    <Field label={label} error={error} hint={hint} className={className}>
+    <Field label={label} error={error} hint={hint} mark={mark} className={className}>
       {(id, d) => (
         <div className="relative">
           <input
@@ -57,7 +64,7 @@ export function TextInput({
             aria-invalid={!!error}
             aria-describedby={d}
             {...rest}
-            className={cx(control, 'h-11', suffix && 'pr-14', error && 'ring-rust/70')}
+            className={cx(control, 'h-11', suffix && 'pr-14', markRing(mark), error && 'ring-rust/70')}
           />
           {suffix && (
             <span className="pointer-events-none absolute inset-y-0 right-3.5 grid place-items-center text-sm text-ink-3">{suffix}</span>
@@ -72,15 +79,16 @@ export function SelectInput({
   label,
   error,
   hint,
+  mark,
   children,
   className,
   ...rest
-}: SelectHTMLAttributes<HTMLSelectElement> & { label: string; error?: string; hint?: ReactNode }) {
+}: SelectHTMLAttributes<HTMLSelectElement> & { label: string; error?: string; hint?: ReactNode; mark?: FieldMark }) {
   return (
-    <Field label={label} error={error} hint={hint} className={className}>
+    <Field label={label} error={error} hint={hint} mark={mark} className={className}>
       {(id, d) => (
         <div className="relative">
-          <select id={id} aria-describedby={d} {...rest} className={cx(control, 'h-11 appearance-none pr-10')}>
+          <select id={id} aria-describedby={d} {...rest} className={cx(control, 'h-11 appearance-none pr-10', markRing(mark))}>
             {children}
           </select>
           <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-ink-3" aria-hidden />

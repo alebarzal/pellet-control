@@ -352,9 +352,30 @@ export const emptyQuality = (): QualitySpec => ({
 /** Marcas habituales en España, para reconocerlas en el texto de la foto. */
 const KNOWN_BRANDS = ['Huella Verde', 'Naturpellet', 'Enerbio', 'Burpellet', 'Ecoforest', 'Pellets Asturias', 'Biomasa Forestal', 'Amatex', 'Ribpellet', 'Gesbrick', 'Pinewells'];
 
+/** Tiendas físicas habituales, por si su nombre sale en la etiqueta del lineal. */
+const KNOWN_STORES: [RegExp, string][] = [
+  [/leclerc/i, 'Leclerc'],
+  [/carrefour/i, 'Carrefour'],
+  [/alcampo/i, 'Alcampo'],
+  [/leroy\s?merlin/i, 'Leroy Merlin'],
+  [/obramat|bricomart/i, 'Obramat'],
+  [/brico\s?dep[oô]t/i, 'Brico Depôt'],
+  [/bauhaus/i, 'Bauhaus'],
+  [/bricor\b/i, 'Bricor'],
+  [/hipercor/i, 'Hipercor'],
+  [/mercadona/i, 'Mercadona'],
+  [/eroski/i, 'Eroski'],
+  [/\blidl\b/i, 'Lidl'],
+  [/\baldi\b/i, 'Aldi'],
+  [/\bmakro\b/i, 'Makro'],
+  [/costco/i, 'Costco'],
+];
+
 export interface LabelData {
   name: string | null;
   brand: string | null;
+  /** Tienda, si su nombre aparece en la foto. */
+  store: string | null;
   weightKg: number | null;
   /** Precio del saco (no el precio por kg que también traen las etiquetas del lineal). */
   price: number | null;
@@ -385,7 +406,39 @@ export function parseLabelText(raw: string, brands: string[] = []): LabelData {
     .map((l) => l.trim())
     .find((l) => /pel+ets?/i.test(l) && l.length >= 6 && l.length <= 60);
   const name = brand ? `Pellet ${brand}${weightKg ? ` ${weightKg} kg` : ''}` : (line ?? null);
-  return { name, brand, weightKg, price: extractLabelPrice(text), quality: extractQuality(text) };
+  const store = KNOWN_STORES.find(([re]) => re.test(text))?.[1] ?? null;
+  return { name, brand, store, weightKg, price: extractLabelPrice(text), quality: extractQuality(text) };
+}
+
+export type LabelField = 'name' | 'brand' | 'store' | 'weight' | 'price' | 'cert' | 'ash' | 'moist' | 'ncv' | 'dur' | 'dia';
+
+export interface LabelReportItem {
+  key: LabelField;
+  label: string;
+  /** Lo leído, ya con su unidad. Null = no sale en la foto y hay que ponerlo a mano. */
+  value: string | null;
+  /** Hace falta para guardar el producto. */
+  required: boolean;
+}
+
+/** Dato a dato, qué se ha leído en la foto y qué falta. */
+export function labelReport(d: LabelData): LabelReportItem[] {
+  const n = (v: number | null | undefined, unit: string) => (v == null ? null : `${String(Math.round(v * 1000) / 1000).replace('.', ',')} ${unit}`);
+  const q = d.quality;
+  const cert = q.certification && q.certification !== 'unknown' ? CERT_LABEL[q.certification] : null;
+  return [
+    { key: 'name', label: 'Producto', value: d.name, required: true },
+    { key: 'brand', label: 'Marca', value: d.brand, required: false },
+    { key: 'store', label: 'Tienda', value: d.store, required: false },
+    { key: 'weight', label: 'Peso', value: n(d.weightKg, 'kg'), required: true },
+    { key: 'price', label: 'Precio', value: n(d.price, '€'), required: true },
+    { key: 'cert', label: 'Certificación', value: cert, required: false },
+    { key: 'ash', label: 'Cenizas', value: n(q.ashPct, '%'), required: false },
+    { key: 'moist', label: 'Humedad', value: n(q.moisturePct, '%'), required: false },
+    { key: 'ncv', label: 'Poder calorífico', value: n(q.ncvKwhKg, 'kWh/kg'), required: false },
+    { key: 'dur', label: 'Durabilidad', value: n(q.durabilityPct, '%'), required: false },
+    { key: 'dia', label: 'Diámetro', value: n(q.diameterMm, 'mm'), required: false },
+  ];
 }
 
 /* ───────────── Buscar el mismo pellet en otras tiendas ───────────── */

@@ -3,10 +3,15 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 /** Plugin nativo (android/.../OcrPlugin.java): lee el texto de una imagen en el propio móvil. */
 const Plugin = registerPlugin<{ recognize(o: { base64: string }): Promise<{ text: string }> }>('PelletOcr');
 
-export const ocrAvailable = () => Capacitor.getPlatform() === 'android';
+/** Solo en desarrollo: texto de prueba para ver el formulario sin un móvil (no existe en la app publicada). */
+const devText = (): string | null => (import.meta.env.DEV ? ((globalThis as { __pcOcrText?: string }).__pcOcrText ?? null) : null);
+
+export const ocrAvailable = () => Capacitor.getPlatform() === 'android' || devText() != null;
 
 /** Texto que se ve en la imagen (JPEG/PNG como data URL). Cadena vacía si no hay lector. */
 export async function recognizeText(dataUrl: string): Promise<string> {
+  const dev = devText();
+  if (dev != null) return dev;
   if (!ocrAvailable()) return '';
   const base64 = dataUrl.replace(/^data:[^,]*,/, '');
   return (await Plugin.recognize({ base64 })).text ?? '';
