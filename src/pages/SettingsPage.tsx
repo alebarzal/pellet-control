@@ -8,6 +8,7 @@ import { saveFile } from '../data/files';
 import { HopperStatus } from '../features/hopper/HopperStatus';
 import { HapticsSetting } from '../features/settings/HapticsSetting';
 import { UpdateCard } from '../features/settings/UpdateCard';
+import { openNavEditor } from '../features/nav/NavEditor';
 import { CalendarSettings } from '../features/calendar/CalendarSettings';
 import { exportData, parseImport } from '../data/repository';
 import { isValidIso, todayIso } from '../domain/dates';
@@ -190,6 +191,13 @@ export function SettingsPage(_: PageProps) {
           </Card>
           <Card>
             <HapticsSetting />
+          </Card>
+          <Card>
+            <SectionTitle>Menú</SectionTitle>
+            <p className="text-sm text-ink-2">Elige qué tres secciones van en la barra de abajo y en qué orden salen las demás en «Más».</p>
+            <Button size="sm" onClick={openNavEditor} className="mt-3">
+              Personalizar el menú
+            </Button>
           </Card>
           <Card>
             <UpdateCard />

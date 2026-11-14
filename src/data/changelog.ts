@@ -14,6 +14,17 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9',
+    date: '2026-11-14',
+    summary: 'Menú a tu gusto',
+    items: [
+      'Personalizar el menú: elige qué tres secciones van en la barra de abajo y en qué orden salen las demás en «Más».',
+      'Se hace arrastrando: lleva una sección encima de otra y se cambian de sitio. También puedes tocar una y después otra.',
+      'Está en «Más» → Personalizar el menú y en Configuración → Menú. «Restablecer» lo deja como venía.',
+      'El orden se guarda en este móvil; cada persona del hogar puede tener el suyo.',
+    ],
+  },
+  {
     version: '1.8',
     date: '2026-11-14',
     summary: 'Aviso al entrar cuando hay una versión nueva',

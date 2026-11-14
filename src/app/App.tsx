@@ -1,4 +1,4 @@
-import { CircleAlert, LayoutGrid, Loader2, Plus, type LucideIcon } from 'lucide-react';
+import { CircleAlert, LayoutGrid, Loader2, Plus, SlidersHorizontal, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { RecordDialogsProvider, useRecordActions } from '../features/records/RecordDialogs';
 import { ConsumptionPage } from '../pages/ConsumptionPage';
@@ -25,6 +25,8 @@ import { ROUTES, useRoute, type Route } from './router';
 import { BackButtonHandler } from '../features/back/BackButton';
 import { WhatsNew } from '../features/settings/WhatsNew';
 import { UpdatePrompt } from '../features/settings/UpdatePrompt';
+import { NavEditor, openNavEditor } from '../features/nav/NavEditor';
+import { useNavLayout } from '../data/navLayout';
 import { checkUpdateQuietly } from '../data/update';
 import { useEffect } from 'react';
 
@@ -43,13 +45,16 @@ function Logo({ light }: { light?: boolean }) {
 
 function Sidebar({ route, go }: { route: Route; go: (r: Route) => void }) {
   const { data } = useStore();
+  // El mismo orden que el usuario ha elegido para el móvil.
+  const layout = useNavLayout();
+  const ordered = [...layout.bar, ...layout.more].map((id) => ROUTES.find((r) => r.id === id)!);
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-forest px-4 py-6 text-paper lg:flex">
       <div className="px-2">
         <Logo light />
       </div>
       <nav aria-label="Secciones" className="mt-10 flex flex-col gap-1">
-        {ROUTES.map((r) => {
+        {ordered.map((r) => {
           const Icon = r.icon;
           const active = r.id === route;
           return (
@@ -83,8 +88,10 @@ function Sidebar({ route, go }: { route: Route; go: (r: Route) => void }) {
   );
 }
 
-/** Barra inferior: dos secciones, botón +, una sección y «Más» (cinco huecos iguales, + en el centro). */
-const MOBILE_MAIN: Route[] = ['inicio', 'clima', 'precios'];
+/**
+ * Barra inferior: dos secciones, botón +, una sección y «Más» (cinco huecos iguales, + en el centro).
+ * Qué secciones van en la barra y el orden de «Más» los elige el usuario (data/navLayout).
+ */
 
 function NavTab({ active, label, icon: Icon, onClick, popup }: { active: boolean; label: string; icon: LucideIcon; onClick: () => void; popup?: boolean }
 ) {
@@ -124,9 +131,10 @@ function NavTab({ active, label, icon: Icon, onClick, popup }: { active: boolean
 function MobileNav({ route, go }: { route: Route; go: (r: Route) => void }) {
   const { openAdd } = useRecordActions();
   const [more, setMore] = useState(false);
-  // En el orden de MOBILE_MAIN (no en el del menú lateral).
-  const items = MOBILE_MAIN.map((id) => ROUTES.find((r) => r.id === id)!);
-  const moreActive = !MOBILE_MAIN.includes(route);
+  const layout = useNavLayout();
+  const find = (id: Route) => ROUTES.find((r) => r.id === id)!;
+  const items = layout.bar.map(find);
+  const moreActive = !layout.bar.includes(route);
 
   return (
     <>
@@ -155,7 +163,7 @@ function MobileNav({ route, go }: { route: Route; go: (r: Route) => void }) {
       </nav>
       <Dialog open={more} onClose={() => setMore(false)} title="Más secciones">
         <div className="grid grid-cols-2 gap-2">
-          {ROUTES.filter((r) => !MOBILE_MAIN.includes(r.id)).map((r) => (
+          {layout.more.map(find).map((r) => (
             <button
               key={r.id}
               onClick={() => {
@@ -173,6 +181,17 @@ function MobileNav({ route, go }: { route: Route; go: (r: Route) => void }) {
             </button>
           ))}
         </div>
+        <button
+          onClick={() => {
+            haptic.tap();
+            setMore(false);
+            openNavEditor();
+          }}
+          className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-ink-2 transition-colors duration-150 hover:bg-sand-soft hover:text-ink active:bg-sand-soft"
+        >
+          <SlidersHorizontal className="size-4" aria-hidden />
+          Personalizar el menú
+        </button>
       </Dialog>
     </>
   );
@@ -217,6 +236,7 @@ function Shell() {
       <BackButtonHandler route={route} go={go} />
       <WhatsNew />
       <UpdatePrompt go={go} />
+      <NavEditor />
     </div>
   );
 }
