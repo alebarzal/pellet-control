@@ -407,8 +407,13 @@ export function MarketPage(_: PageProps) {
       <Card className="mt-4">
         <SectionTitle
           aside={
-            <span className="hidden text-sm text-ink-3 sm:block">
-              {isNative() ? 'Se actualiza al abrir si pasaron más de 12 h' : 'En el PC, la consulta usa el servidor de desarrollo'}
+            <span className="flex items-center gap-3">
+              <span className="hidden text-sm text-ink-3 lg:block">
+                {isNative() ? 'Se actualiza al abrir si pasaron más de 12 h' : 'En el PC, la consulta usa el servidor de desarrollo'}
+              </span>
+              <Button size="sm" icon={<CameraIcon className="size-4" />} onClick={() => setDialog({ type: 'add', store: true })}>
+                Saco en tienda
+              </Button>
             </span>
           }
         >

@@ -18,7 +18,7 @@ export const CHANGELOG: Release[] = [
     date: '2026-11-14',
     summary: 'Saco visto en tienda, con foto',
     items: [
-      'Botón «Saco en tienda» en Precios: abre la cámara, haces la foto al saco o a la etiqueta del precio y la app rellena todo lo que consiga leer.',
+      'Botón «Saco en tienda» en Precios, arriba y dentro de la comparativa: abre la cámara, haces la foto al saco o a la etiqueta del precio y la app rellena todo lo que consiga leer.',
       'Después te enseña dato a dato qué ha leído (en verde, para que lo revises) y qué falta: en ámbar lo que hace falta para guardar y en gris lo que puedes dejar en blanco.',
       'Los campos del formulario llevan la misma marca: «Leído en la foto» o «Ponlo a mano».',
       'Si el nombre de la tienda sale en la etiqueta (Leclerc, Carrefour, Alcampo…), también lo rellena.',
