@@ -14,6 +14,16 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.12',
+    date: '2026-11-16',
+    summary: 'La app pide una foto cuando el cálculo se aleja de la última lectura',
+    items: [
+      'Cuando el nivel calculado de la tolva ha bajado 20 puntos desde tu última lectura (por ejemplo, de 70 % a 50 %), la tarjeta de la tolva te pide comprobarlo con una foto.',
+      'La foto corrige el nivel y afina los kg por hora, así que el cálculo va cuadrando mejor cada vez.',
+      'Con «Ahora no» el aviso se calla y vuelve si el nivel baja 10 puntos más.',
+    ],
+  },
+  {
     version: '1.11',
     date: '2026-11-16',
     summary: 'La tolva baja sola según lo que quema la caldera',

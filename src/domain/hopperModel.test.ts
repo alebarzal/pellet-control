@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sampleData } from '../test/fixtures';
-import { burnRate, hopperEstimate, hopperModel } from './hopperModel';
+import { burnRate, hopperEstimate, hopperModel, photoCheck } from './hopperModel';
 import type { AppData, PelletRecord, PlugReading } from './types';
 
 const t = (day: number, h = 0, m = 0) => new Date(2026, 10, day, h, m).getTime();
@@ -58,6 +58,37 @@ describe('nivel de la tolva calculado', () => {
     expect(h.approximate).toBe(true);
     expect(h.percent).toBeCloseTo(57.5, 0);
     expect(h.date).toBe(iso(4));
+  });
+
+  it('pide una foto cuando el cálculo ha bajado 20 puntos desde la última lectura', () => {
+    const d = base(true);
+    d.records.push(level(2, 8, 80), level(3, 8, 72.5));
+    // Un día después: 7,5 puntos. Todavía no.
+    const soon = photoCheck(hopperModel(d, t(4, 8)))!;
+    expect(soon.due).toBe(false);
+    expect(soon.from).toBeCloseTo(72.5, 0);
+    expect(soon.drop).toBeCloseTo(7.5, 0);
+    // Más de tres días después: unas 21 h de quemador, más de 60 kg y de 20 puntos.
+    const m = hopperModel(d, t(6, 22))!;
+    const late = photoCheck(m)!;
+    expect(late.due).toBe(true);
+    expect(late.from).toBeCloseTo(72.5, 0);
+    expect(late.drop).toBeGreaterThan(24);
+    expect(late.drop).toBeLessThan(29);
+    expect(late.to).toBeCloseTo(late.from - late.drop, 5);
+    // «Ahora no»: calla hasta que baje 10 puntos más, y solo para esa misma lectura.
+    expect(photoCheck(m, { anchorAt: m.anchor.at, percent: m.percent })!.due).toBe(false);
+    expect(photoCheck(m, { anchorAt: m.anchor.at, percent: m.percent + 11 })!.due).toBe(true);
+    expect(photoCheck(m, { anchorAt: m.anchor.at - 1, percent: m.percent })!.due).toBe(true);
+    // Una lectura nueva lo deja a cero.
+    d.records.push(level(6, 22, 44));
+    expect(photoCheck(hopperModel(d, t(6, 23)))!.due).toBe(false);
+  });
+
+  it('sin datos de quemado no pide foto', () => {
+    const d = base(false);
+    d.records.push(level(2, 8, 80));
+    expect(photoCheck(hopperModel(d, t(9, 8)))).toBeNull();
   });
 
   it('prevé cuándo se vacía y dibuja el recorrido', () => {

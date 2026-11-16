@@ -428,6 +428,45 @@ export function hopperModel(data: AppData, now = Date.now()): HopperModel | null
   };
 }
 
+/* ───────────── ¿Toca comprobarlo con una foto? ───────────── */
+
+/** Puntos de porcentaje que puede bajar el nivel calculado desde la última lectura antes de pedir una foto. */
+export const CHECK_AFTER_POINTS = 20;
+/** Tras un «ahora no», se vuelve a pedir cuando baja estos puntos más. */
+export const CHECK_AGAIN_POINTS = 10;
+
+export interface PhotoCheck {
+  /** Hay que pedir la foto ahora. */
+  due: boolean;
+  /** Nivel del que partía el cálculo (última lectura más recargas), en %. */
+  from: number;
+  /** Nivel calculado ahora, en %. */
+  to: number;
+  /** Puntos que ha bajado solo por cálculo, sin ninguna lectura que lo confirme. */
+  drop: number;
+}
+
+export interface CheckSnooze {
+  /** Lectura a la que se refiere el aplazamiento. */
+  anchorAt: number;
+  /** Nivel calculado cuando se aplazó. */
+  percent: number;
+}
+
+/**
+ * Cuando el nivel calculado se ha alejado mucho de la última lectura (por ejemplo de 70 % a 50 %), el error
+ * acumulado puede ser grande: toca medir con una foto, que corrige el nivel y afina los kg por hora.
+ */
+export function photoCheck(m: HopperModel | null, snooze: CheckSnooze | null = null): PhotoCheck | null {
+  if (!m || m.capacityKg <= 0 || m.method === 'lectura') return null;
+  const to = m.percent;
+  const from = Math.min(100, ((m.kg + m.burnedKg) / m.capacityKg) * 100);
+  const drop = Math.max(0, from - to);
+  let due = drop >= CHECK_AFTER_POINTS;
+  if (due && snooze && snooze.anchorAt === m.anchor.at && to > snooze.percent - CHECK_AGAIN_POINTS) due = false;
+  return { due, from, to, drop };
+}
+
 /* ───────────── Lo que usa el resto de la app ───────────── */
 
 /** «Ahora» para un cálculo hecho como si fuera el día `today` (hoy = el momento actual; otro día = su mediodía). */

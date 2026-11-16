@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowDownToLine, Camera, ChartLine, Gauge } from 'lucide-react';
 import { LEVEL_LABEL, levelCategory } from '../../domain/calc';
-import { hopperEstimate } from '../../domain/hopperModel';
+import { hopperEstimate, photoCheck, type CheckSnooze } from '../../domain/hopperModel';
 import { todayIso } from '../../domain/dates';
 import { fmtDate, fmtKg, fmtNum } from '../../domain/format';
 import type { LevelCategory } from '../../domain/types';
@@ -31,6 +31,17 @@ const QUICK: { percent: number; label: string }[] = [
   { percent: 100, label: 'Llena' },
 ];
 
+const SNOOZE_KEY = 'pellet-control:photo-check-snooze';
+
+function readSnooze(): CheckSnooze | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(SNOOZE_KEY) ?? 'null') as CheckSnooze | null;
+    return v && typeof v.anchorAt === 'number' && typeof v.percent === 'number' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 /** La hora actual, refrescada cada minuto: el nivel calculado baja solo mientras la caldera quema. */
 function useNow(everyMs = 60_000) {
   const [now, setNow] = useState(() => Date.now());
@@ -59,6 +70,19 @@ export function HopperStatus({ footer }: { footer?: ReactNode } = {}) {
   const tone = cat ? LEVEL_TONE[cat] : null;
   const [photo, setPhoto] = useState(false);
   const [forecast, setForecast] = useState(false);
+  const [snooze, setSnooze] = useState<CheckSnooze | null>(readSnooze);
+  const check = photoCheck(m, snooze);
+
+  function later() {
+    if (!m) return;
+    const v: CheckSnooze = { anchorAt: m.anchor.at, percent: m.percent };
+    setSnooze(v);
+    try {
+      localStorage.setItem(SNOOZE_KEY, JSON.stringify(v));
+    } catch {
+      /* sin almacenamiento: vale para esta sesión */
+    }
+  }
 
   /** Al apuntar una lectura: lo que marcaba el cálculo justo antes, para ver si va cuadrando. */
   const versus = (percent: number): string | undefined => {
@@ -150,6 +174,26 @@ export function HopperStatus({ footer }: { footer?: ReactNode } = {}) {
             </div>
           ) : (
             <p className="mt-2 text-[0.8125rem] text-ink-3">Actualizado el {fmtDate(h.date)}</p>
+          )}
+          {check?.due && (
+            <div role="status" className="mt-4 rounded-2xl bg-amber-soft p-3.5">
+              <p className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
+                <Camera className="size-4 shrink-0 text-amber" aria-hidden />
+                Toca comprobarlo con una foto
+              </p>
+              <p className="num mt-1 text-[0.8125rem] text-ink-2">
+                El cálculo ha bajado de {Math.round(check.from)} % a {Math.round(check.to)} % sin ninguna lectura. Una foto de la tolva lo corrige y afina el
+                ritmo de quemado.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" variant="primary" icon={<Camera className="size-4" />} onClick={() => setPhoto(true)}>
+                  Hacer foto
+                </Button>
+                <Button size="sm" variant="ghost" onClick={later}>
+                  Ahora no
+                </Button>
+              </div>
+            </div>
           )}
         </>
       ) : (
