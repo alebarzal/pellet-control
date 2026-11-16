@@ -1,4 +1,5 @@
 import { addDays, diffDays, monthKey, monthRange, todayIso, weekStart, yearKey } from './dates';
+import { hopperEstimate, nowFor } from './hopperModel';
 import type {
   AppData,
   ConsumptionRecord,
@@ -39,27 +40,9 @@ export function currentLevel(records: PelletRecord[]): LevelRecord | null {
   return levels.at(-1) ?? null;
 }
 
-export interface HopperEstimate {
-  percent: number;
-  category: LevelCategory;
-  approximate: boolean;
-  /** kg estimados en la tolva, null si no hay capacidad configurada. */
-  kg: number | null;
-  date: string;
-}
-
-export function hopperEstimate(data: AppData): HopperEstimate | null {
-  const lvl = currentLevel(data.records);
-  if (!lvl) return null;
-  const cap = data.settings.hopperCapacityKg;
-  return {
-    percent: lvl.percent,
-    category: levelCategory(lvl.percent),
-    approximate: lvl.approximate,
-    kg: cap ? (cap * lvl.percent) / 100 : null,
-    date: lvl.date,
-  };
-}
+// El nivel actual (última lectura puesta al día con recargas y pellet quemado) se calcula en hopperModel.ts.
+export { hopperEstimate, nowFor };
+export type { HopperEstimate } from './hopperModel';
 
 /* ───────────── Inventario almacenado ───────────── */
 
@@ -451,7 +434,7 @@ export function autonomy(data: AppData, today = todayIso()): Autonomy | null {
   const stats = consumptionStats(statsData(data), today);
   if (stats.avgDailyKg == null) return null;
   const stock = storedStock(data);
-  const hopper = hopperEstimate(data);
+  const hopper = hopperEstimate(data, nowFor(today));
   const hopperKg = hopper?.kg ?? 0;
   const availableKg = stock.kg + hopperKg;
   const days = availableKg / stats.avgDailyKg;

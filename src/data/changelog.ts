@@ -14,6 +14,19 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.11',
+    date: '2026-11-16',
+    summary: 'La tolva baja sola según lo que quema la caldera',
+    items: [
+      'Nivel calculado: la app parte de tu última lectura, suma las recargas y resta lo que se va quemando. El porcentaje, la barra y la caldera de Inicio se ponen al día solos, minuto a minuto.',
+      'Con el enchufe de la caldera se usan las horas reales de quemador. Los kg por hora los saca la app de tus propias lecturas: entre dos fotos sabe cuánto bajó el pellet y cuánto estuvo encendido el quemador.',
+      'Sin enchufe, se usa tu consumo medio diario. Y si no hay ningún dato de quemado, se queda la última lectura: no se inventa nada.',
+      'Botón «Previsión» en la tolva: gráfico con lo calculado, la previsión de los próximos días, el margen de error y cuándo se vaciaría.',
+      'Cuadre con tus lecturas: cada vez que subes una foto ves lo que marcaba el cálculo frente a lo que has medido, y la lectura corrige el nivel y afina el ritmo.',
+      'La barra de la tolva marca la última lectura y el margen de la estimación. La autonomía, el calendario y el widget usan ya el nivel puesto al día.',
+    ],
+  },
+  {
     version: '1.10',
     date: '2026-11-14',
     summary: 'Saco visto en tienda, con foto',

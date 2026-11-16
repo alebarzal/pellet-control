@@ -1,4 +1,4 @@
-import { consumptionStats, effectivePricePerBag, hopperEstimate, statsData, storedStock } from './calc';
+import { consumptionStats, effectivePricePerBag, hopperEstimate, nowFor, statsData, storedStock } from './calc';
 import { addDays, todayIso } from './dates';
 import { fmtBags, fmtDate, fmtEur, fmtKg } from './format';
 import type { AppData } from './types';
@@ -23,17 +23,19 @@ export function calendarPlan(data: AppData, leadDays: number, today = todayIso()
   if (avg == null || avg <= 0) return [];
   const events: PlannedEvent[] = [];
   const cap = data.settings.hopperCapacityKg;
-  const hopper = hopperEstimate(data);
+  const hopper = hopperEstimate(data, nowFor(today));
   const stock = storedStock(data);
   const bagKg = data.settings.bagWeightKg;
   const later = (d: string) => (d < today ? today : d);
 
-  // Recarga: cuando la tolva baje del umbral, contando desde el último nivel apuntado.
+  // Recarga: cuando la tolva baje del umbral. El nivel ya viene puesto al día (pellet quemado desde la última
+  // lectura), así que se cuenta desde hoy; si no se ha podido poner al día, desde la fecha de la lectura.
+  const hopperFrom = hopper?.live ? today : (hopper?.date ?? today);
   let hopperEmptyDate: string | null = null;
   if (hopper?.kg != null && cap) {
     const lowKg = (cap * REFILL_AT_PERCENT) / 100;
     const days = Math.max(0, Math.floor((hopper.kg - lowKg) / avg));
-    const date = later(addDays(hopper.date, days));
+    const date = later(addDays(hopperFrom, days));
     const bags = Math.max(1, Math.min(Math.max(0, stock.bags), Math.round((cap - lowKg) / bagKg)));
     events.push({
       key: 'refill',
@@ -44,12 +46,12 @@ export function calendarPlan(data: AppData, leadDays: number, today = todayIso()
         ` Consumo medio: ${fmtKg(Math.round(avg * 10) / 10)}/día.`,
       date,
     });
-    hopperEmptyDate = addDays(hopper.date, Math.floor(hopper.kg / avg));
+    hopperEmptyDate = addDays(hopperFrom, Math.floor(hopper.kg / avg));
   }
 
   // Compra: unos días antes de que se acabe todo el pellet (almacén + tolva).
   const totalKg = Math.max(0, stock.kg) + (hopper?.kg ?? 0);
-  const base = hopper?.kg != null ? hopper.date : today;
+  const base = hopper?.kg != null ? hopperFrom : today;
   const runOut = addDays(base, Math.floor(totalKg / avg));
   const price = effectivePricePerBag(data).value;
   events.push({

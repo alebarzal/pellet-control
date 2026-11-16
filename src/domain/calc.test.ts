@@ -191,8 +191,10 @@ describe('consumo', () => {
     expect(c.currentMonthKg).toBeCloseTo(100);
     expect(c.avgDailyCost).toBeCloseTo(3.3);
     const a = autonomy(d, '2026-11-10')!;
-    expect(a.availableKg).toBeCloseTo(90 + 120);
-    expect(a.days).toBeCloseTo(21);
+    // La tolva (120 kg en la última lectura) se pone al día con lo quemado desde entonces a 10 kg/día.
+    expect(a.availableKg).toBeLessThan(90 + 120);
+    expect(a.availableKg).toBeGreaterThan(90 + 120 - 30);
+    expect(a.days).toBeCloseTo(a.availableKg / 10);
   });
   it('por inventario con lecturas exactas y recarga conocida', () => {
     let d = createSeedData();

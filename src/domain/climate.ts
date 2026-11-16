@@ -1,4 +1,4 @@
-import { consumptionPeriods, consumptionStats, dailyConsumption, hopperEstimate, statsData, storedStock } from './calc';
+import { consumptionPeriods, consumptionStats, dailyConsumption, hopperEstimate, nowFor, statsData, storedStock } from './calc';
 import { addDays, diffDays, todayIso } from './dates';
 import type { AppData, OutdoorDay, TempReading } from './types';
 
@@ -130,7 +130,7 @@ export function climateForecast(data: AppData, horizon = 7, today = todayIso()):
   const future = daily.filter((d) => d.date >= today).slice(0, horizon);
   if (!future.length) return null;
 
-  const availableKg = storedStock(data).kg + (hopperEstimate(data)?.kg ?? 0);
+  const availableKg = storedStock(data).kg + (hopperEstimate(data, nowFor(today))?.kg ?? 0);
   let acc = 0;
   let runOutDate: string | null = null;
   const days = future.map((d) => {
