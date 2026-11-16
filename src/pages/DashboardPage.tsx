@@ -17,7 +17,7 @@ import {
   hopperEstimate,
   MIN_DAYS_FOR_AVERAGE,
   purchaseSummary,
-  spendCounter,
+  spendCounter, lastSpend, purchasesAfterSpend,
   seasonSpend,
   monthConsumption,
   effectivePricePerBag,
@@ -117,6 +117,8 @@ export function DashboardPage({ go }: PageProps) {
   const hopper = hopperEstimate(data);
   const spend = purchaseSummary(sdata);
   const counter = spendCounter(data);
+  const counterSpend = lastSpend(data);
+  const counterReal = counterSpend ? purchasesAfterSpend(data, counterSpend).amount : spend.totalSpent;
   const [quickEdit, setQuickEdit] = useState<QuickEditTarget | null>(null);
   // «Esta temporada» respeta la puesta a cero del gasto; las estadísticas siguen con lo gastado de verdad.
   const season = { totalSpent: seasonSpend(data).amount };
@@ -265,7 +267,7 @@ export function DashboardPage({ go }: PageProps) {
           onEdit={() => setQuickEdit('spend')}
           footer={
             counter.since
-              ? `Contando desde el ${fmtDate(counter.since)} · total real ${fmtEur(spend.totalSpent)}`
+              ? `Contando desde el ${fmtDate(counter.since)} · compras apuntadas desde entonces: ${fmtEur(counterReal)}`
               : spend.count
                 ? `${spend.count} ${spend.count === 1 ? 'compra' : 'compras'}`
                 : statsReset(data)

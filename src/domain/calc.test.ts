@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { addDays, todayIso } from './dates';
 import { sampleData as createSeedData } from '../test/fixtures';
 import {
   autonomy,
@@ -15,8 +16,7 @@ import {
   consumedTotal,
   statsData,
   refillStats,
-  storedStock,
-} from './calc';
+  storedStock, lastSpend, purchasesAfterSpend } from './calc';
 import type { AppData, NewRecord, PelletRecord } from './types';
 
 const T = '2026-11-09';
@@ -99,6 +99,38 @@ describe('contador de gasto', () => {
     let d = add(createSeedData(), { kind: 'spend', date: '2026-11-09', amount: 59.4, bags: 12, notes: '' });
     d = add(d, { kind: 'purchase', date: '2026-11-10', brand: 'X', supplier: '', bags: 3, pricePerBag: 5, totalCost: 15, bagWeightKg: 15, notes: '' });
     expect(spendCounter(d)).toEqual({ amount: 74.4, since: '2026-11-09', bags: 15 });
+  });
+});
+
+describe('contador de gasto con fecha', () => {
+  it('fechado hacia atrás suma también las compras de ese mismo día', () => {
+    let d = add(createSeedData(), { kind: 'purchase', date: '2026-09-25', brand: 'X', supplier: '', bags: 4, pricePerBag: 5, totalCost: 20, bagWeightKg: 15, notes: '' });
+    const s = { date: '2026-09-25', createdAt: new Date(2026, 10, 16, 12).getTime() };
+    expect(purchasesAfterSpend(d, s).amount).toBeCloseTo(20 + purchaseSummary(createSeedData(), (p) => p.date >= '2026-09-25').totalSpent);
+    d = { ...d, records: [...d.records, { kind: 'spend', date: s.date, amount: 0, bags: 0, notes: '', id: 'sp', createdAt: s.createdAt } as PelletRecord] };
+    expect(spendCounter(d).since).toBe('2026-09-25');
+    expect(spendCounter(d).amount).toBeCloseTo(purchasesAfterSpend(d, s).amount);
+  });
+  it('un ajuste hecho hoy solo suma lo apuntado después', () => {
+    const now = Date.now();
+    const today = todayIso();
+    const d = add(createSeedData(), { kind: 'purchase', date: today, brand: 'X', supplier: '', bags: 2, pricePerBag: 5, totalCost: 10, bagWeightKg: 15, notes: '' });
+    const p = d.records.at(-1)!;
+    p.createdAt = now - 1000;
+    expect(purchasesAfterSpend(d, { date: today, createdAt: now }).amount).toBe(0);
+  });
+  it('si empieza antes de la temporada, «Esta temporada» suma lo comprado dentro de ella', () => {
+    let d = createSeedData();
+    const start = d.settings.seasonStart;
+    d = add(d, { kind: 'purchase', date: start, brand: 'X', supplier: '', bags: 2, pricePerBag: 5, totalCost: 10, bagWeightKg: 15, notes: '' });
+    d = { ...d, records: [...d.records, { kind: 'spend', date: addDays(start, -6), amount: 50, notes: '', id: 'sp2', createdAt: Date.now() } as PelletRecord] };
+    expect(seasonSpend(d).amount).toBeCloseTo(purchaseSummary(d, (p) => p.date >= start && p.date <= d.settings.seasonEnd).totalSpent);
+  });
+  it('un reinicio de estadísticas posterior manda sobre el ajuste', () => {
+    let d = add(createSeedData(), { kind: 'spend', date: '2026-11-01', amount: 100, notes: '' });
+    d = add(d, { kind: 'counter', metric: 'stats', date: '2026-11-09', value: null, notes: '' });
+    expect(spendCounter(d).since).toBeNull();
+    expect(lastSpend(d)).toBeNull();
   });
 });
 

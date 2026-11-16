@@ -14,6 +14,17 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.14',
+    date: '2026-11-16',
+    summary: 'Gasto acumulado con fecha de inicio y más ajustes al editar',
+    items: [
+      'Gasto acumulado: nuevo campo «Contando desde». Puedes poner, por ejemplo, el 25 de septiembre, y la app te enseña lo que llevas comprado desde ese día con un botón «Usar».',
+      'En la misma edición, «Temporada y objetivo»: inicio y fin de la temporada y el objetivo de gasto, sin ir a Configuración.',
+      'Sacos almacenados: puedes indicar la fecha del recuento; lo registrado después se suma o se resta.',
+      'La tarjeta del gasto enseña las compras apuntadas desde la fecha de inicio, y «Esta temporada» cuenta bien aunque el contador empiece antes de la temporada.',
+    ],
+  },
+  {
     version: '1.13',
     date: '2026-11-16',
     summary: 'Notificación en el móvil cuando toca hacer la foto de la tolva',

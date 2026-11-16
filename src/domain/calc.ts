@@ -1,4 +1,4 @@
-import { addDays, diffDays, monthKey, monthRange, todayIso, weekStart, yearKey } from './dates';
+import { addDays, diffDays, monthKey, monthRange, todayIso, toIso, weekStart, yearKey } from './dates';
 import { hopperEstimate, nowFor } from './hopperModel';
 import type {
   AppData,
@@ -10,6 +10,7 @@ import type {
   PurchaseRecord,
   RefillRecord,
   Settings,
+  SpendRecord,
 } from './types';
 
 /* ───────────── Orden ───────────── */
@@ -110,31 +111,60 @@ export interface SpendCounter {
   bags: number | null;
 }
 
-/** «Gasto acumulado» de Inicio: último ajuste de gasto + compras posteriores. */
-export function spendCounter(all: AppData): SpendCounter {
-  const data = statsData(all);
+/**
+ * ¿Cuenta esta compra para un ajuste de gasto? Las de días posteriores, siempre. Las del mismo día: si el
+ * ajuste se hizo ese mismo día, solo las apuntadas después (como el parcial de un coche); si se fechó hacia
+ * atrás («contando desde el 25 de septiembre»), todas las de ese día.
+ */
+function countsAfter(s: { date: string; createdAt: number }) {
+  const sameDay = toIso(new Date(s.createdAt)) === s.date;
+  return (p: PelletRecord) => p.date > s.date || (p.date === s.date && (!sameDay || p.createdAt > s.createdAt));
+}
+
+/** Compras que se suman a un ajuste de gasto con esa fecha (y hora de creación). */
+export function purchasesAfterSpend(data: AppData, s: { date: string; createdAt: number }): { amount: number; bags: number } {
+  const after = countsAfter(s);
   let amount = 0;
-  let bags: number | null = 0;
-  let since: string | null = null;
-  for (const r of sortRecords(data.records)) {
-    if (r.kind === 'spend') {
-      amount = r.amount;
-      bags = r.bags ?? (r.amount === 0 ? 0 : null);
-      since = r.date;
-    } else if (r.kind === 'purchase') {
+  let bags = 0;
+  for (const r of data.records) {
+    if (r.kind === 'purchase' && after(r)) {
       amount += r.totalCost;
-      if (bags != null) bags += r.bags;
+      bags += r.bags;
     }
   }
-  return { amount, since, bags };
+  return { amount, bags };
+}
+
+/** Último ajuste del gasto acumulado (null si no hay, o si después se reiniciaron las estadísticas). */
+export function lastSpend(data: AppData): SpendRecord | null {
+  const last = sortRecords(data.records.filter((r): r is SpendRecord => r.kind === 'spend')).at(-1) ?? null;
+  const reset = statsReset(data);
+  if (last && reset && reset.createdAt > last.createdAt) return null;
+  return last;
+}
+
+/** «Gasto acumulado» de Inicio: último ajuste de gasto + compras posteriores. */
+export function spendCounter(all: AppData): SpendCounter {
+  const s = lastSpend(all);
+  if (!s) {
+    const p = purchaseSummary(statsData(all));
+    return { amount: p.totalSpent, since: null, bags: p.totalBags };
+  }
+  const after = purchasesAfterSpend(all, s);
+  const base = s.bags ?? (s.amount === 0 ? 0 : null);
+  return { amount: s.amount + after.amount, since: s.date, bags: base != null ? base + after.bags : null };
 }
 
 /** Gasto de la temporada que muestra Inicio: si el contador se reinició dentro de la temporada, cuenta desde ahí. */
 export function seasonSpend(all: AppData): { amount: number; since: string | null } {
   const data = statsData(all);
-  const c = spendCounter(data);
+  const c = spendCounter(all);
   const { seasonStart, seasonEnd } = data.settings;
   if (c.since && c.since >= seasonStart && c.since <= seasonEnd) return { amount: c.amount, since: c.since };
+  // El contador empezó antes de la temporada: lo comprado dentro de la temporada desde entonces.
+  const s = lastSpend(all);
+  if (s && c.since && c.since < seasonStart)
+    return { amount: purchaseSummary(all, (p) => p.date >= seasonStart && p.date <= seasonEnd).totalSpent, since: null };
   return { amount: purchaseSummary(data, (p) => p.date >= seasonStart && p.date <= seasonEnd).totalSpent, since: null };
 }
 
