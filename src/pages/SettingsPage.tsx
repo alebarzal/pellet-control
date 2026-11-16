@@ -6,6 +6,7 @@ import { useSync } from '../features/sync/SyncProvider';
 import { ExportExcelButton } from '../features/export/ExportExcelButton';
 import { saveFile } from '../data/files';
 import { HopperStatus } from '../features/hopper/HopperStatus';
+import { PhotoCheckSetting } from '../features/hopper/PhotoCheckSetting';
 import { HapticsSetting } from '../features/settings/HapticsSetting';
 import { UpdateCard } from '../features/settings/UpdateCard';
 import { openNavEditor } from '../features/nav/NavEditor';
@@ -185,6 +186,9 @@ export function SettingsPage(_: PageProps) {
         <div className="flex flex-col gap-4">
           <Card>
             <HopperStatus />
+          </Card>
+          <Card>
+            <PhotoCheckSetting />
           </Card>
           <Card>
             <CalendarSettings />

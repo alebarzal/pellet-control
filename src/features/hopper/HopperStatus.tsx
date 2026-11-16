@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowDownToLine, Camera, ChartLine, Gauge } from 'lucide-react';
 import { LEVEL_LABEL, levelCategory } from '../../domain/calc';
-import { hopperEstimate, photoCheck, type CheckSnooze } from '../../domain/hopperModel';
+import { hopperEstimate, photoCheck } from '../../domain/hopperModel';
+import { setCheckSnooze, useCheckSnooze } from '../../data/photoCheck';
 import { todayIso } from '../../domain/dates';
 import { fmtDate, fmtKg, fmtNum } from '../../domain/format';
 import type { LevelCategory } from '../../domain/types';
@@ -31,17 +32,6 @@ const QUICK: { percent: number; label: string }[] = [
   { percent: 100, label: 'Llena' },
 ];
 
-const SNOOZE_KEY = 'pellet-control:photo-check-snooze';
-
-function readSnooze(): CheckSnooze | null {
-  try {
-    const v = JSON.parse(localStorage.getItem(SNOOZE_KEY) ?? 'null') as CheckSnooze | null;
-    return v && typeof v.anchorAt === 'number' && typeof v.percent === 'number' ? v : null;
-  } catch {
-    return null;
-  }
-}
-
 /** La hora actual, refrescada cada minuto: el nivel calculado baja solo mientras la caldera quema. */
 function useNow(everyMs = 60_000) {
   const [now, setNow] = useState(() => Date.now());
@@ -70,18 +60,11 @@ export function HopperStatus({ footer }: { footer?: ReactNode } = {}) {
   const tone = cat ? LEVEL_TONE[cat] : null;
   const [photo, setPhoto] = useState(false);
   const [forecast, setForecast] = useState(false);
-  const [snooze, setSnooze] = useState<CheckSnooze | null>(readSnooze);
+  const snooze = useCheckSnooze();
   const check = photoCheck(m, snooze);
 
   function later() {
-    if (!m) return;
-    const v: CheckSnooze = { anchorAt: m.anchor.at, percent: m.percent };
-    setSnooze(v);
-    try {
-      localStorage.setItem(SNOOZE_KEY, JSON.stringify(v));
-    } catch {
-      /* sin almacenamiento: vale para esta sesión */
-    }
+    if (m) setCheckSnooze({ anchorAt: m.anchor.at, percent: m.percent });
   }
 
   /** Al apuntar una lectura: lo que marcaba el cálculo justo antes, para ver si va cuadrando. */

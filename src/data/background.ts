@@ -1,5 +1,6 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { SENSITIVITY } from '../domain/heating';
+import type { PhotoCheckPlan } from '../domain/hopperModel';
 import type { ClimateSettings, PlugReading, TempReading } from '../domain/types';
 
 /** Plugin nativo (android/.../BackgroundSensorsPlugin.java): lectura de sensores con la app cerrada y avisos. */
@@ -17,6 +18,8 @@ interface BackgroundSensorsPlugin {
   drain(): Promise<{ readings: TempReading[]; plug?: PlugReading[]; heating: boolean }>;
   requestNotifications(): Promise<{ granted: boolean }>;
   testNotification(): Promise<void>;
+  setPhotoCheck(o: { enabled: boolean; key: string; remainingKg: number; kgPerHour: number; kgPerDay: number; fromPercent: number; targetPercent: number }): Promise<void>;
+  testPhotoNotification(): Promise<void>;
 }
 
 const Plugin = registerPlugin<BackgroundSensorsPlugin>('BackgroundSensors');
@@ -54,4 +57,16 @@ export async function requestNotifications(): Promise<boolean> {
 
 export async function testNotification() {
   if (backgroundAvailable()) await Plugin.testNotification();
+}
+
+/** Deja dicho al móvil cuánto pellet falta por quemar para pedir la foto de la tolva (null = no avisar). */
+export async function setPhotoCheckBackground(plan: PhotoCheckPlan | null) {
+  if (!backgroundAvailable()) return;
+  await Plugin.setPhotoCheck(
+    plan ? { enabled: true, ...plan } : { enabled: false, key: '', remainingKg: 0, kgPerHour: 0, kgPerDay: 0, fromPercent: 0, targetPercent: 0 },
+  );
+}
+
+export async function testPhotoNotification() {
+  if (backgroundAvailable()) await Plugin.testPhotoNotification();
 }

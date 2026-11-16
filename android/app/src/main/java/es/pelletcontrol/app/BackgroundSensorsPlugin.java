@@ -62,17 +62,69 @@ public class BackgroundSensorsPlugin extends Plugin {
                 .putBoolean("notify", notify)
                 .apply();
 
-        WorkManager wm = WorkManager.getInstance(getContext());
-        if (token == null || token.isEmpty() || secret == null || secret.isEmpty() || (ids.length() == 0 && plugId.isEmpty())) {
-            wm.cancelUniqueWork(WORK);
-        } else {
-            Constraints c = new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();
-            PeriodicWorkRequest req = new PeriodicWorkRequest.Builder(SensorWorker.class, 15, TimeUnit.MINUTES)
-                    .setConstraints(c)
-                    .build();
-            wm.enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.UPDATE, req);
-        }
+        schedule();
         SensorWorker.ensureChannel(getContext());
+        call.resolve();
+    }
+
+    /**
+     * La tarea periódica hace falta si hay sensores que leer o si hay que vigilar el aviso de foto de la tolva.
+     * Solo exige conexión cuando hay sensores.
+     */
+    private void schedule() {
+        SharedPreferences p = prefs();
+        boolean sensors = false;
+        try {
+            sensors = !p.getString("token", "").isEmpty() && !p.getString("secret", "").isEmpty()
+                    && (new JSONArray(p.getString("deviceIds", "[]")).length() > 0 || !p.getString("plugId", "").isEmpty());
+        } catch (Exception ignored) {
+        }
+        boolean photo = p.getBoolean("pcEnabled", false);
+        WorkManager wm = WorkManager.getInstance(getContext());
+        if (!sensors && !photo) {
+            wm.cancelUniqueWork(WORK);
+            return;
+        }
+        Constraints c = new Constraints.Builder().setRequiredNetworkType(sensors ? NetworkType.CONNECTED : NetworkType.NOT_REQUIRED).build();
+        PeriodicWorkRequest req = new PeriodicWorkRequest.Builder(SensorWorker.class, 15, TimeUnit.MINUTES)
+                .setConstraints(c)
+                .build();
+        wm.enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.UPDATE, req);
+    }
+
+    private static float num(PluginCall call, String key) {
+        Object v = call.getData().opt(key);
+        return v instanceof Number ? ((Number) v).floatValue() : 0f;
+    }
+
+    /**
+     * Aviso de «toca comprobar la tolva con una foto»: la app deja dicho cuánto pellet falta por quemar
+     * y a qué ritmo; la tarea periódica va descontando y avisa al llegar.
+     */
+    @PluginMethod
+    public void setPhotoCheck(PluginCall call) {
+        boolean enabled = Boolean.TRUE.equals(call.getBoolean("enabled", false));
+        String key = call.getString("key", "");
+        boolean was = prefs().getBoolean("pcEnabled", false);
+        prefs().edit()
+                .putBoolean("pcEnabled", enabled)
+                .putString("pcKey", key == null ? "" : key)
+                .putFloat("pcRemainingKg", num(call, "remainingKg"))
+                .putFloat("pcKgPerHour", num(call, "kgPerHour"))
+                .putFloat("pcKgPerDay", num(call, "kgPerDay"))
+                .putFloat("pcFrom", num(call, "fromPercent"))
+                .putFloat("pcTarget", num(call, "targetPercent"))
+                .putFloat("pcBurned", 0f)
+                .putLong("pcLastRun", System.currentTimeMillis())
+                .apply();
+        if (enabled != was) schedule();
+        if (enabled) SensorWorker.ensureChannel(getContext());
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void testPhotoNotification(PluginCall call) {
+        SensorWorker.notifyPhoto(getContext(), 70, 50);
         call.resolve();
     }
 

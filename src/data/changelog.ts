@@ -14,6 +14,16 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.13',
+    date: '2026-11-16',
+    summary: 'Notificación en el móvil cuando toca hacer la foto de la tolva',
+    items: [
+      'El aviso de «toca comprobarlo con una foto» puede llegarte también como notificación, con la app cerrada. Actívalo en Configuración → «Aviso de foto de la tolva».',
+      'El móvil va descontando lo que quema la caldera (con el enchufe, o con tu consumo medio si no lo tienes) y avisa al llegar a los 20 puntos. Cada aviso llega una sola vez.',
+      'Al tocar la notificación se abre la app con el aviso en la tarjeta de la tolva, listo para hacer la foto.',
+    ],
+  },
+  {
     version: '1.12',
     date: '2026-11-16',
     summary: 'La app pide una foto cuando el cálculo se aleja de la última lectura',

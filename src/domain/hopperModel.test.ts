@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sampleData } from '../test/fixtures';
-import { burnRate, hopperEstimate, hopperModel, photoCheck } from './hopperModel';
+import { burnRate, hopperEstimate, hopperModel, photoCheck, photoCheckPlan } from './hopperModel';
 import type { AppData, PelletRecord, PlugReading } from './types';
 
 const t = (day: number, h = 0, m = 0) => new Date(2026, 10, day, h, m).getTime();
@@ -83,6 +83,31 @@ describe('nivel de la tolva calculado', () => {
     // Una lectura nueva lo deja a cero.
     d.records.push(level(6, 22, 44));
     expect(photoCheck(hopperModel(d, t(6, 23)))!.due).toBe(false);
+  });
+
+  it('calcula cuánto falta por quemar para avisar con la app cerrada', () => {
+    const d = base(true);
+    d.records.push(level(2, 8, 80), level(3, 8, 72.5));
+    // Un día después: de 72,5 % a 65 %. Salta al llegar a 52,5 %: faltan 12,5 puntos = 30 kg.
+    const m1 = hopperModel(d, t(4, 8))!;
+    const plan = photoCheckPlan(m1)!;
+    expect(plan.targetPercent).toBeCloseTo(52.5, 0);
+    expect(plan.remainingKg).toBeCloseTo(30, 0);
+    expect(plan.kgPerHour).toBeCloseTo(3, 1);
+    expect(plan.kgPerDay).toBeGreaterThan(0);
+    expect(plan.key).toBe(`${m1.anchor.at}:${Math.round(plan.targetPercent)}`);
+    // Cuando ya toca, el aviso está a la vista en la app: nada que vigilar.
+    const m2 = hopperModel(d, t(6, 22))!;
+    expect(photoCheckPlan(m2)).toBeNull();
+    // Tras «ahora no», vigila los 10 puntos siguientes (24 kg).
+    const again = photoCheckPlan(m2, { anchorAt: m2.anchor.at, percent: m2.percent })!;
+    expect(again.remainingKg).toBeCloseTo(24, 0);
+    expect(again.targetPercent).toBeCloseTo(m2.percent - 10, 5);
+    expect(again.key).not.toBe(plan.key);
+    // Sin datos de quemado no hay plan.
+    const e = base(false);
+    e.records.push(level(2, 8, 80));
+    expect(photoCheckPlan(hopperModel(e, t(9, 8)))).toBeNull();
   });
 
   it('sin datos de quemado no pide foto', () => {

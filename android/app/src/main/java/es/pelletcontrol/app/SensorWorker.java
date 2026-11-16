@@ -55,7 +55,12 @@ public class SensorWorker extends Worker {
         SharedPreferences p = getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String token = p.getString("token", "");
         String secret = p.getString("secret", "");
-        if (token.isEmpty() || secret.isEmpty()) return Result.success();
+        if (token.isEmpty() || secret.isEmpty()) {
+            // Sin sensores, la tarea solo vigila el aviso de foto de la tolva (con el consumo medio).
+            photoCheck(getApplicationContext(), p, null);
+            return Result.success();
+        }
+        Boolean plugOn = null;
         try {
             JSONArray ids = new JSONArray(p.getString("deviceIds", "[]"));
             JSONArray indoor = new JSONArray(p.getString("indoorIds", "[]"));
@@ -124,6 +129,7 @@ public class SensorWorker extends Worker {
                                 String.format(new Locale("es", "ES"), "El enchufe de la caldera marca %.0f W. Medido por el enchufe SwitchBot.", watts));
                     }
                     e.putBoolean("plugOn", on).putBoolean("heating", on);
+                    plugOn = on;
                     PelletWidget.savePlug(getApplicationContext(), watts, on);
                 }
             }
@@ -147,11 +153,48 @@ public class SensorWorker extends Worker {
                 e.putLong("lastAt", t).putLong("lastAvg", Double.doubleToLongBits(avg)).putBoolean("heating", heating);
             }
             e.apply();
+            photoCheck(getApplicationContext(), p, plugOn);
             if (n > 0 || outdoorTemp != null) PelletWidget.saveTemps(getApplicationContext(), n > 0 ? sum / n : null, outdoorTemp);
         } catch (Exception ignored) {
             return Result.retry();
         }
         return Result.success();
+    }
+
+    /**
+     * Aviso de foto de la tolva. La app deja dicho cuántos kg faltan por quemar para pedir la foto; aquí se
+     * descuenta lo quemado desde la última pasada: con el enchufe, el tiempo de quemador encendido × kg por
+     * hora; sin lectura del enchufe, el consumo medio diario. Cada aviso (pcKey) se envía una sola vez.
+     */
+    static void photoCheck(Context ctx, SharedPreferences p, Boolean plugOn) {
+        if (!p.getBoolean("pcEnabled", false)) return;
+        String key = p.getString("pcKey", "");
+        if (key.isEmpty() || key.equals(p.getString("pcNotified", ""))) return;
+        long now = System.currentTimeMillis();
+        double elapsedH = Math.max(0, now - p.getLong("pcLastRun", now)) / 3_600_000.0;
+        double perHour = p.getFloat("pcKgPerHour", 0f);
+        double perDay = p.getFloat("pcKgPerDay", 0f);
+        double add;
+        if (plugOn != null && perHour > 0) {
+            // Una lectura del enchufe cubre como mucho media hora, igual que en la app.
+            add = plugOn ? Math.min(elapsedH, 0.5) * perHour : 0;
+        } else {
+            add = elapsedH / 24.0 * perDay;
+        }
+        double burned = p.getFloat("pcBurned", 0f) + add;
+        SharedPreferences.Editor e = p.edit().putFloat("pcBurned", (float) burned).putLong("pcLastRun", now);
+        float remaining = p.getFloat("pcRemainingKg", 0f);
+        if (remaining > 0 && burned >= remaining) {
+            notifyPhoto(ctx, p.getFloat("pcFrom", 0f), p.getFloat("pcTarget", 0f));
+            e.putString("pcNotified", key);
+        }
+        e.apply();
+    }
+
+    static void notifyPhoto(Context ctx, float from, float to) {
+        String text = String.format(new Locale("es", "ES"),
+                "El nivel calculado ha bajado de %.0f %% a unos %.0f %% sin ninguna lectura. Una foto lo corrige y afina el cálculo.", from, to);
+        notify(ctx, 1002, "Toca comprobar la tolva con una foto", text);
     }
 
     /** Igual que plugWatts() de la app: power en W (Plug Mini EU) o tensión × corriente en mA (US/JP). */
@@ -213,20 +256,24 @@ public class SensorWorker extends Worker {
     static void ensureChannel(Context ctx) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel ch = new NotificationChannel(CHANNEL, "Caldera", NotificationManager.IMPORTANCE_DEFAULT);
-            ch.setDescription("Aviso cuando la casa empieza a calentarse");
+            ch.setDescription("Avisos de la caldera y de la tolva");
             ctx.getSystemService(NotificationManager.class).createNotificationChannel(ch);
         }
     }
 
     /** Notificación «la caldera parece haber arrancado». También la usa la app para enviar una prueba. */
     static void notifyStart(Context ctx, String title, String text) {
+        notify(ctx, 1001, title, text);
+    }
+
+    static void notify(Context ctx, int id, String title, String text) {
         if (Build.VERSION.SDK_INT >= 33
                 && ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
         ensureChannel(ctx);
         Intent open = new Intent(ctx, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent pi = PendingIntent.getActivity(ctx, 0, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pi = PendingIntent.getActivity(ctx, id, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, CHANNEL)
                 .setSmallIcon(R.drawable.ic_pc_foreground)
                 .setColor(0xFF2C3A29)
@@ -235,7 +282,7 @@ public class SensorWorker extends Worker {
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(text))
                 .setContentIntent(pi)
                 .setAutoCancel(true);
-        NotificationManagerCompat.from(ctx).notify(1001, b.build());
+        NotificationManagerCompat.from(ctx).notify(id, b.build());
     }
 
     private void notifyStart(double temp, double rise) {

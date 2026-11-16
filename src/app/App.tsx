@@ -24,6 +24,7 @@ import { ToastProvider } from '../ui/Toast';
 import { ROUTES, useRoute, type Route } from './router';
 import { BackButtonHandler } from '../features/back/BackButton';
 import { WhatsNew } from '../features/settings/WhatsNew';
+import { PhotoCheckSync } from '../features/hopper/PhotoCheckSync';
 import { UpdatePrompt } from '../features/settings/UpdatePrompt';
 import { NavEditor, openNavEditor } from '../features/nav/NavEditor';
 import { useNavLayout } from '../data/navLayout';
@@ -236,6 +237,7 @@ function Shell() {
       <BackButtonHandler route={route} go={go} />
       <WhatsNew />
       <UpdatePrompt go={go} />
+      <PhotoCheckSync />
       <NavEditor />
     </div>
   );

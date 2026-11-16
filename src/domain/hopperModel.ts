@@ -467,6 +467,36 @@ export function photoCheck(m: HopperModel | null, snooze: CheckSnooze | null = n
   return { due, from, to, drop };
 }
 
+/** Lo que necesita el móvil para avisar con la app cerrada: cuánto pellet falta por quemar hasta pedir la foto. */
+export interface PhotoCheckPlan {
+  /** Identifica el aviso (lectura de partida y nivel al que salta): no se repite dos veces el mismo. */
+  key: string;
+  remainingKg: number;
+  /** kg por hora de quemador (0 si no se calcula con el enchufe). */
+  kgPerHour: number;
+  /** kg al día previstos, para cuando no hay lectura del enchufe. */
+  kgPerDay: number;
+  fromPercent: number;
+  targetPercent: number;
+}
+
+/**
+ * Plan del aviso en segundo plano. Null si no hay nada que vigilar: sin datos de quemado, o si el aviso
+ * ya está a la vista dentro de la app.
+ */
+export function photoCheckPlan(m: HopperModel | null, snooze: CheckSnooze | null = null): PhotoCheckPlan | null {
+  const c = photoCheck(m, snooze);
+  if (!c || !m || c.due) return null;
+  const snoozed = snooze != null && snooze.anchorAt === m.anchor.at && c.drop >= CHECK_AFTER_POINTS;
+  const target = snoozed ? snooze.percent - CHECK_AGAIN_POINTS : c.from - CHECK_AFTER_POINTS;
+  const remainingKg = ((c.to - target) / 100) * m.capacityKg;
+  if (target <= 0 || remainingKg <= 0) return null;
+  const kgPerHour = m.method === 'quemador' && m.rate ? m.rate.kgPerHour : 0;
+  const kgPerDay = m.dailyKg ?? 0;
+  if (kgPerHour <= 0 && kgPerDay <= 0) return null;
+  return { key: `${m.anchor.at}:${Math.round(target)}`, remainingKg, kgPerHour, kgPerDay, fromPercent: c.from, targetPercent: target };
+}
+
 /* ───────────── Lo que usa el resto de la app ───────────── */
 
 /** «Ahora» para un cálculo hecho como si fuera el día `today` (hoy = el momento actual; otro día = su mediodía). */
