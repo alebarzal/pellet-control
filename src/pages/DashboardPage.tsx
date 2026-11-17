@@ -123,6 +123,9 @@ export function DashboardPage({ go }: PageProps) {
   // «Esta temporada» respeta la puesta a cero del gasto; las estadísticas siguen con lo gastado de verdad.
   const season = { totalSpent: seasonSpend(data).amount };
   const monthCons = monthConsumption(data, today);
+  // Gasto del mes: lo comprado de verdad este mes.
+  const monthSpend = purchaseSummary(data, (p) => monthKey(p.date) === monthKey(today));
+  const monthName = fmtMonth(monthKey(today), true).split(' ')[0];
   const price = effectivePricePerBag(data);
   const cons = consumptionStats(sdata, today);
   const auto = autonomy(data, today);
@@ -281,10 +284,14 @@ export function DashboardPage({ go }: PageProps) {
               {counter.bags != null && (
                 <p className="num mt-1 text-[0.9375rem] font-semibold text-ink">
                   {fmtBags(counter.bags)}
-                  {counter.bags > 0 && <span className="font-normal text-ink-2"> · {fmtEur(counter.amount / counter.bags)}/saco</span>}
+                  {price.value != null && <span className="font-normal text-ink-2"> · {fmtEur(price.value)}/saco</span>}
                 </p>
               )}
-              <p className="num mt-2 text-[0.9375rem] text-ink-2">Esta temporada: {fmtEur(season.totalSpent)}</p>
+              <p className="num mt-2 text-[0.9375rem] text-ink-2">
+                {monthName.charAt(0).toUpperCase() + monthName.slice(1)}: <span className="font-semibold text-ink">{fmtEur(monthSpend.totalSpent)}</span>
+                {monthSpend.totalBags > 0 && <> · {fmtBags(monthSpend.totalBags)}</>}
+              </p>
+              <p className="num mt-0.5 text-[0.9375rem] text-ink-2">Esta temporada: {fmtEur(season.totalSpent)}</p>
               {budget != null && (
                 <div className="mt-3">
                   <div className="h-2 overflow-hidden rounded-full bg-sand">

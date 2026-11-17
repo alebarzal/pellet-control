@@ -14,6 +14,15 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.15',
+    date: '2026-11-17',
+    summary: 'Gasto del mes en Inicio y un solo precio por saco',
+    items: [
+      'La tarjeta «Gasto acumulado» enseña lo comprado este mes, en euros y sacos.',
+      'El precio por saco de esa tarjeta es el mismo que el de «Precio por saco» (el fijado a mano o la media de tus compras), en lugar de dividir el gasto entre los sacos.',
+    ],
+  },
+  {
     version: '1.14',
     date: '2026-11-16',
     summary: 'Gasto acumulado con fecha de inicio y más ajustes al editar',
